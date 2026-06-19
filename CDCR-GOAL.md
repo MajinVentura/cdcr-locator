@@ -18,28 +18,42 @@ see the working Wisconsin version as your reference implementation.
   CDCR adult institutions (as of January 2026) with names and addresses. Use
   **exactly these 31** — do not add or drop any, and do not second-guess the list.
 - Replace every Wisconsin entry. Field shape: `name, county, addr, lat, lon,
-  security, gender, yearOpened, population, description, details, aerial (Google
-  Maps 3D link), url (official cdcr.ca.gov page), image`. **Drop the `phone`
-  field** — it is not wanted for this project, so also remove the click-to-call
-  phone line from the marker popup template in `index.html`.
+  security, mission, gender, yearOpened, population, description, details, aerial
+  (Google Maps 3D link), url (official cdcr.ca.gov page), image`. **Drop the
+  `phone` field** — it is not wanted for this project, so also remove the
+  click-to-call phone line from the marker popup template in `index.html`.
 - The addresses come from the roster; you still need to research and fill the rest
   per facility: `lat`/`lon` (must be accurate — markers and routing depend on
-  them), `security` (Level(s) — see §2), `gender`, `yearOpened`,
-  `population`/capacity, `description`, `details`, `url`, `aerial`.
+  them), `security` (ALL levels housed — see §2), `mission` (type — see §2),
+  `gender`, `yearOpened`, `population`/capacity, `description`, `details`, `url`,
+  `aerial`.
 - Source facts from official CDCR pages + Wikipedia. Flag anything you can't
   verify instead of inventing it. Convert relative dates to absolute.
 
-### 2. Security classification scheme (the main real adaptation)
+### 2. Security levels & mission/type (the main real adaptation)
 - CDCR uses **Security Levels I–IV** (I = lowest, IV = highest) plus **Reception
-  Centers** and camps, and **many institutions house multiple levels at once.**
-  Pick and document a single-marker rule (suggested: the **highest level
-  present**, or the facility's primary mission).
-- Encode security by **both marker shape AND color** plus the small building
-  glyph, the way the WI version does (see `securityOf()` and `facilityIcon()`).
-  Propose a clean mapping, e.g. a green→red ramp across Level I→IV with a distinct
-  shape, plus a slate diamond for Reception/Other. Keep this palette visually
-  distinct from the drive-time palette (green/yellow/orange/red).
-- Update the security **filter** checkboxes and the **legend** to match.
+  Centers** and conservation camps, and **most institutions house multiple levels
+  at once.**
+- Record the **full set of levels** each facility houses in `security` — list them
+  ALL, do NOT collapse to the highest (e.g. "Levels I–IV", "Levels III–IV",
+  "Reception Center"). Keep a categorizer that returns the level array so the
+  filter matches a facility if it houses ANY checked level — the template's
+  `secCategories()` / `facilityPasses()` already work this way; adapt them to
+  I / II / III / IV / Reception.
+- Add a **`mission`** field for facility type/role, e.g. General Population,
+  Reception Center, Women's, Medical / Health Care (CHCF, CMF), Substance-Abuse
+  Treatment (SATF), Conservation/Training Center (SCC), Rehabilitation/Reentry.
+  Show it in the popup and the result card.
+- Marker encoding (the one real visual decision): a marker can only cleanly show
+  one or two dimensions, while facilities have multiple levels. **Recommended:
+  shape = mission/type, color = security intensity** (green→red by the highest
+  level housed, slate for Reception/none) plus the building glyph — this shows
+  both at a glance without lying about a single "level." Before committing,
+  **render a small comparison mockup of the marker options and let the user pick**
+  the final shapes/colors (this is how the WI version's markers were chosen).
+- Update the **filters** (security level multi-select: I–IV + Reception; consider
+  adding a mission filter) and the **legend** to match. Keep marker colors as
+  visually distinct from the drive-time palette as the scheme allows.
 
 ### 3. Photos
 - The 7 JPGs in `images/` are Wisconsin facilities — **remove them** and add
