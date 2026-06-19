@@ -17,12 +17,14 @@ see the working Wisconsin version as your reference implementation.
 - **The authoritative roster is `FACILITIES-LIST.txt`** in this folder: 31 active
   CDCR adult institutions (as of January 2026) with names and addresses. Use
   **exactly these 31** — do not add or drop any, and do not second-guess the list.
-- Replace every Wisconsin entry. Keep the exact field shape: `name, phone, county,
-  addr, lat, lon, security, gender, yearOpened, population, description, details,
-  aerial (Google Maps 3D link), url (official cdcr.ca.gov page), image`.
+- Replace every Wisconsin entry. Field shape: `name, county, addr, lat, lon,
+  security, gender, yearOpened, population, description, details, aerial (Google
+  Maps 3D link), url (official cdcr.ca.gov page), image`. **Drop the `phone`
+  field** — it is not wanted for this project, so also remove the click-to-call
+  phone line from the marker popup template in `index.html`.
 - The addresses come from the roster; you still need to research and fill the rest
   per facility: `lat`/`lon` (must be accurate — markers and routing depend on
-  them), `phone`, `security` (Level(s) — see §2), `gender`, `yearOpened`,
+  them), `security` (Level(s) — see §2), `gender`, `yearOpened`,
   `population`/capacity, `description`, `details`, `url`, `aerial`.
 - Source facts from official CDCR pages + Wikipedia. Flag anything you can't
   verify instead of inventing it. Convert relative dates to absolute.
@@ -59,8 +61,9 @@ times; adjustable result count (3/5/10) and sort (drive time / distance) off cac
 routes; drive-time color scoring on routes + time-bubbles + result cards; white
 route casing; pulsing origin pin; security + gender filters with a "X of N shown"
 count; result cards; Browse-all A–Z list; Recent searches (localStorage, last 5);
-Reset button; rich popups (photo, stats, click-to-call, official page, Aerial 3D,
-Open in Maps); street/satellite base layers; zoom-gated facility name labels.
+Reset button; rich popups (photo, stats, official page, Aerial 3D, Open in Maps —
+no phone/click-to-call); street/satellite base layers; zoom-gated facility name
+labels.
 
 ## Constraints (unchanged)
 Single self-contained `index.html` (vanilla JS, no build/framework/bundler) plus a
