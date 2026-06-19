@@ -14,14 +14,16 @@ see the working Wisconsin version as your reference implementation.
 ## What to change
 
 ### 1. Facility data (`const FACILITIES = [...]` near the top of `<script>`)
-- Replace every Wisconsin entry with the **current active CDCR adult
-  institutions** (~31). **Verify the live roster against cdcr.ca.gov** — CDCR has
-  closed/deactivated several recently (e.g. DVI Tracy in 2021, CCC Susanville in
-  2023) and more are planned. Do **not** trust an old "33 prisons" list.
-- Keep the exact field shape: `name, phone, county, addr, lat, lon, security,
-  gender, yearOpened, population, description, details, aerial (Google Maps 3D
-  link), url (official cdcr.ca.gov page), image`.
-- `lat`/`lon` must be accurate — markers and routing depend on them.
+- **The authoritative roster is `FACILITIES-LIST.txt`** in this folder: 31 active
+  CDCR adult institutions (as of January 2026) with names and addresses. Use
+  **exactly these 31** — do not add or drop any, and do not second-guess the list.
+- Replace every Wisconsin entry. Keep the exact field shape: `name, phone, county,
+  addr, lat, lon, security, gender, yearOpened, population, description, details,
+  aerial (Google Maps 3D link), url (official cdcr.ca.gov page), image`.
+- The addresses come from the roster; you still need to research and fill the rest
+  per facility: `lat`/`lon` (must be accurate — markers and routing depend on
+  them), `phone`, `security` (Level(s) — see §2), `gender`, `yearOpened`,
+  `population`/capacity, `description`, `details`, `url`, `aerial`.
 - Source facts from official CDCR pages + Wikipedia. Flag anything you can't
   verify instead of inventing it. Convert relative dates to absolute.
 
