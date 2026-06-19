@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WIDOC Adult Institution Locator</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --panel: #ffffff;
+    --ink: #1a2733;
+    --muted: #5d6b78;
+    --accent: #0b5cad;
+    --hot: #d6361f;
+    --line: #e2e7ec;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    padding: 14px 20px;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; white-space: nowrap; }
+  .search { display: flex; gap: 8px; flex: 1; min-width: 280px; }
+  .search input {
+    flex: 1;
+    padding: 9px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+  }
+  .search button {
+    padding: 9px 16px;
+    border: none;
+    border-radius: 6px;
+    background: #073f78;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .search button:hover { background: #052e58; }
+  .reset-btn {
+    padding: 9px 14px; border: 1px solid rgba(255,255,255,.55);
+    border-radius: 6px; background: transparent; color: #fff;
+    font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .reset-btn:hover { background: rgba(255,255,255,.15); }
+  /* address autocomplete dropdown */
+  .search-wrap { position: relative; flex: 1; display: flex; min-width: 0; }
+  .search-wrap input { flex: 1; }
+  .suggest {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1200;
+    margin: 0; padding: 4px; list-style: none; background: #fff; color: var(--ink);
+    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.28);
+    max-height: 320px; overflow-y: auto;
+  }
+  .suggest[hidden] { display: none; }
+  .suggest li { padding: 7px 10px; border-radius: 6px; cursor: pointer; line-height: 1.25; }
+  .suggest li:hover, .suggest li.active { background: #eef3f9; }
+  .suggest .s-main { font-size: 14px; font-weight: 600; }
+  .suggest .s-sub { font-size: 12px; color: var(--muted); }
+  .main { flex: 1; display: flex; min-height: 0; }
+  #panel {
+    width: 380px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    padding: 16px;
+  }
+  #map { flex: 1; }
+  .status { color: var(--muted); font-size: 14px; padding: 8px 2px; }
+  .status.error { color: var(--hot); font-weight: 600; }
+  .origin {
+    font-size: 13px; color: var(--muted); margin-bottom: 10px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--line);
+  }
+  .origin b { color: var(--ink); }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: box-shadow .12s, border-color .12s;
+  }
+  .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); border-color: var(--accent); }
+  .card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,115,232,.35); }
+  .filters { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+  .filt-row { display: flex; align-items: center; gap: 12px; font-size: 13px; margin: 4px 0; }
+  .filt-label { width: 60px; color: var(--muted); font-weight: 600; }
+  .filters label { cursor: pointer; user-select: none; white-space: nowrap; }
+  .filters input { vertical-align: middle; margin-right: 3px; }
+  .filt-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
+  .filt-count { font-size: 12px; color: #fff; background: var(--accent); border-radius: 10px; padding: 2px 9px; white-space: nowrap; }
+  .card .rank {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--hot); color: #fff; font-size: 13px; font-weight: 700;
+    margin-right: 8px; vertical-align: middle;
+  }
+  .card .name { font-weight: 600; font-size: 15px; vertical-align: middle; }
+  .card .addr { color: var(--muted); font-size: 13px; margin: 6px 0 0 30px; }
+  .card .dist { font-size: 13px; margin: 6px 0 0 30px; }
+  .card .dist b { color: var(--accent); font-size: 15px; }
+  .tchip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-weight: 700; font-size: 12px; vertical-align: middle; }
+  /* result count / sort controls */
+  .res-ctrl { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .res-ctrl label { display: flex; align-items: center; gap: 5px; }
+  .res-ctrl select { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); cursor: pointer; }
+  /* recent searches */
+  .recent { margin-bottom: 12px; }
+  .recent-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .linkbtn { border: none; background: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; }
+  .linkbtn:hover { text-decoration: underline; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 12px; background: #eef3f9; border: 1px solid var(--line); color: var(--ink); border-radius: 14px; padding: 4px 10px; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip:hover { border-color: var(--accent); background: #e3edf8; }
+  /* browse all facilities (collapsible) */
+  .browse { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
+  .browse summary { cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: 600; list-style: none; user-select: none; }
+  .browse summary::-webkit-details-marker { display: none; }
+  .browse summary::before { content: '\25B8'; margin-right: 6px; color: var(--muted); display: inline-block; transition: transform .15s; }
+  .browse[open] summary::before { transform: rotate(90deg); }
+  .browse-list { max-height: calc(100vh - 230px); overflow-y: auto; border-top: 1px solid var(--line); }
+  .browse-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
+  .browse-item:last-child { border-bottom: none; }
+  .browse-item:hover { background: #eef3f9; }
+  .browse-item .bi-name { font-weight: 600; }
+  .browse-item .bi-sub { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .legend {
+    font-size: 13.5px; color: #3f4d59; margin-top: 16px;
+    padding-top: 14px; border-top: 1px solid var(--line); line-height: 1.75;
+  }
+  .legend b { font-size: 15px; }
+  .dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .disclaimer { font-style: italic; font-size: 12px; line-height: 1.55; color: var(--muted); }
+
+  /* Rich popup */
+  .leaflet-popup-content { margin: 0; width: 300px !important; }
+  .fac-pop img { width: 100%; height: 150px; object-fit: cover; display: block; border-radius: 8px 8px 0 0; }
+  .fac-pop .body { padding: 10px 12px 12px; }
+  .fac-pop h3 { margin: 0 0 4px; font-size: 15px; color: var(--ink); }
+  .fac-pop .paddr { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+  .fac-pop .meta { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 12px; margin: 0 0 8px; }
+  .fac-pop .meta dt { color: var(--muted); }
+  .fac-pop .meta dd { margin: 0; color: var(--ink); }
+  .fac-pop .desc { font-size: 12px; line-height: 1.45; color: var(--ink); margin: 0 0 8px; }
+  .fac-pop .links { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 2px; }
+  .fac-pop a.gov { font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none; }
+  .fac-pop a.gov:hover { text-decoration: underline; }
+  .fac-pop .noimg { height: 70px; background: linear-gradient(135deg,#0b5cad,#073f78); border-radius: 8px 8px 0 0; }
+
+  /* Route drive-time bubbles */
+  .route-label {
+    background: #fff; color: #1a2733; border: 1px solid #c4ccd4;
+    border-radius: 14px; padding: 2px 9px; font-size: 12px; font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0,0,0,.25); white-space: nowrap;
+  }
+  /* drive-time color buckets — shared meaning across route bubbles, markers & cards */
+  .route-label.rl-g { background: #1e9e4a; color: #fff; border-color: #178a40; }
+  .route-label.rl-y { background: #f2c200; color: #3a2f00; border-color: #d4ab00; }
+  .route-label.rl-o { background: #ec7a1c; color: #fff; border-color: #cf6810; }
+  .route-label.rl-r { background: #d6361f; color: #fff; border-color: #b82a16; }
+  .route-label.sel { box-shadow: 0 0 0 2px #fff, 0 2px 10px rgba(0,0,0,.5); transform: scale(1.08); }
+  .route-label::before { display: none; } /* hide tooltip arrow */
+
+  /* Always-on faint facility name labels */
+  .fac-name-label {
+    background: transparent; border: none; box-shadow: none; padding: 0;
+    color: #14202b; font-size: 11px; font-weight: 600; opacity: .68;
+    text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 2px #fff;
+    pointer-events: none;
+  }
+  .fac-name-label::before { display: none; }
+
+  /* facility markers (shape/color = security level) */
+  .fac-mk svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+  .fac-mk.emph svg { filter: drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+
+  /* entered-address pin (stands out from the facility markers) */
+  .origin-pin svg { display: block; filter: drop-shadow(0 3px 4px rgba(0,0,0,.45)); position: relative; z-index: 2; }
+  .origin-pin::before {
+    content: ''; position: absolute; left: 9px; top: 34px; width: 16px; height: 16px;
+    border-radius: 50%; background: rgba(124,47,247,.45); z-index: 1;
+    animation: origin-pulse 1.9s ease-out infinite;
+  }
+  @keyframes origin-pulse {
+    0%   { transform: scale(.5); opacity: .75; }
+    70%  { transform: scale(2.6); opacity: 0; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>WIDOC Adult Institution Locator</h1>
+  <form class="search" id="searchForm">
+    <div class="search-wrap">
+      <input id="addr" type="text" placeholder="Enter a Wisconsin address, city, or ZIP…" autocomplete="off" />
+      <ul id="suggestions" class="suggest" hidden></ul>
+    </div>
+    <button type="submit">Find closest</button>
+  </form>
+  <button type="button" id="resetBtn" class="reset-btn">Reset map</button>
+</header>
+<div class="main">
+  <div id="panel">
+    <div class="filters">
+      <div class="filt-head">Filter facilities <span id="filtCount" class="filt-count">19 of 19</span></div>
+      <div class="filt-row">
+        <span class="filt-label">Security</span>
+        <label><input type="checkbox" class="f-sec" value="Minimum" checked> Min</label>
+        <label><input type="checkbox" class="f-sec" value="Medium" checked> Med</label>
+        <label><input type="checkbox" class="f-sec" value="Maximum" checked> Max</label>
+      </div>
+      <div class="filt-row">
+        <span class="filt-label">Houses</span>
+        <label><input type="checkbox" class="f-gen" value="Male" checked> Male</label>
+        <label><input type="checkbox" class="f-gen" value="Female" checked> Female</label>
+      </div>
+    </div>
+    <div class="recent" id="recent" style="display:none">
+      <div class="recent-head"><span>Recent searches</span><button type="button" id="clearRecent" class="linkbtn">Clear</button></div>
+      <div class="chips" id="recentChips"></div>
+    </div>
+    <details class="browse" id="browseAll">
+      <summary>Browse all facilities (A&ndash;Z)</summary>
+      <div class="browse-list" id="browseList"></div>
+    </details>
+    <div class="status" id="status">Enter an address above to find the closest adult institutions, or browse the full list below. Hover any marker for its name &amp; address; click a marker for full details and a photo.</div>
+    <div class="res-ctrl" id="resultControls" style="display:none">
+      <label>Show
+        <select id="resCount">
+          <option value="3">3</option>
+          <option value="5">5</option>
+          <option value="10">10</option>
+        </select>
+      </label>
+      <label>Sort by
+        <select id="resSort">
+          <option value="min">Drive time</option>
+          <option value="miles">Distance</option>
+        </select>
+      </label>
+    </div>
+    <div id="results"></div>
+    <div class="legend">
+      <div style="margin-bottom:6px"><b style="color:var(--ink)">Security level</b> <span style="font-size:12.5px">— marker shape &amp; color</span></div>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><circle cx="16" cy="16" r="13" fill="#2f9e44" stroke="#fff" stroke-width="2.5"/></svg> Minimum
+        &nbsp;<svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><rect x="3" y="3" width="26" height="26" rx="6" fill="#1c7ed6" stroke="#fff" stroke-width="2.5"/></svg> Medium
+      </div>
+      <div>
+        <svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><path d="M16 2.5 L29.5 28 L2.5 28 Z" fill="#e03131" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg> Maximum
+        &nbsp;<svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><path d="M16 2 L30 16 L16 30 L2 16 Z" fill="#5c6b7a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg> Other
+      </div>
+      <div style="margin-top:4px;font-size:12.5px">Each marker has a cell-block glyph; result facilities are enlarged.</div>
+      <div style="margin-top:10px"><svg width="15" height="19" viewBox="0 0 34 44" style="vertical-align:middle;margin-right:5px"><path d="M17 2C9 2 2.5 8.5 2.5 16.5 2.5 27 17 42 17 42S31.5 27 31.5 16.5C31.5 8.5 25 2 17 2z" fill="#7c3aed" stroke="#fff" stroke-width="2.5"/><circle cx="17" cy="16.5" r="5.5" fill="#fff"/></svg> Entered address</div>
+      <div style="margin-top:10px">
+        <b style="color:var(--ink)">Drive time</b> <span style="font-size:12.5px">— routes &amp; result cards</span><br>
+        <span class="dot" style="background:#1e9e4a"></span> Under 45 min
+        &nbsp;<span class="dot" style="background:#f2c200"></span> 45&ndash;75 min<br>
+        <span class="dot" style="background:#ec7a1c"></span> 75&ndash;120 min
+        &nbsp;<span class="dot" style="background:#d6361f"></span> Over 120 min
+      </div>
+      <div style="margin-top:6px">The selected route is drawn thicker — click any route or card to select it.</div>
+      <div class="disclaimer" style="margin-top:8px">Drive times/distances come from live routing (typical traffic-free conditions) and may differ from Google Maps. Population/capacity figures are point-in-time; most facilities run over design capacity.</div>
+    </div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// Wisconsin DOC adult institutions — addresses/details verified against the
+// official WIDOC pages (doc.wi.gov) plus Wikipedia/Wikimedia. Population figures
+// are point-in-time snapshots; most facilities run over design capacity.
+// ---------------------------------------------------------------------------
+const FACILITIES = [
+  { name: "Chippewa Valley Correctional Treatment Facility", phone: "(715) 720-2850", county: "Chippewa County", addr: "2909 E. Park Ave., Chippewa Falls, WI 54729", lat: 44.9280, lon: -91.3502, security: "Minimum", gender: "Male", yearOpened: "2004", population: "300 beds (capacity)", description: "A minimum-security all-male facility focused on substance-abuse treatment and the Earned Release Program; renamed from Highview in 2004.", details: "The 300-bed facility provides full medical, dental, and mental-health services and offers programming in computers, adult basic education, GED, parenting, and reentry alongside its core substance-abuse treatment, having accepted its first inmates on April 20, 2004.", aerial: "https://www.google.com/maps/@44.931417,-91.3482888,166a,35y,211.62h,59.12t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/ChippewaValleyCorrectionalTreatmentFacility.aspx", image: "images/chippewa-valley.jpg" },
+  { name: "Columbia Correctional Institution", phone: "(608) 742-9100", county: "Columbia County", addr: "2925 Columbia Drive, Portage, WI 53901", lat: 43.5656, lon: -89.4919, security: "Maximum (mixed)", gender: "Male", yearOpened: "1986", population: "~830 avg. (FY2018); op. capacity ~541", description: "A maximum-security facility notable for having housed serial killer Jeffrey Dahmer, who was killed there by a fellow inmate in 1994.", details: "Located in Portage with an operating capacity around 541, it offers vocational training in custodial/building maintenance and print works, GED and adult basic education, anger management, and cognitive intervention, plus a 'Dogs on Call' therapy program for inmates in social isolation.", aerial: "https://www.google.com/maps/place/Columbia+Correctional+Institution/@43.5630937,-89.4941342,253a,35y,33.86h,55.7t/data=!3m1!1e3!4m6!3m5!1s0x88ef46ee9bd8977f:0x9888a5da81d9279f!8m2!3d43.5650782!4d-89.4925371!16s%2Fm%2F0282vw0!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/ColumbiaCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/5/5a/Columbia_Correctional_Institution_Wisconsin_with_guard_tower.jpg" },
+  { name: "Dodge Correctional Institution", phone: "(920) 324-5577", county: "Dodge County", addr: "1 W. Lincoln Street, Waupun, WI 53963", lat: 43.6297, lon: -88.7317, security: "Maximum", gender: "Male", yearOpened: "1978", population: "~1,597 (FY2023); op. capacity ~1,165", description: "The central reception, intake and assessment center for all adult male inmates entering Wisconsin's prison system, and the division's central medical center.", details: "Working with the Bureau of Offender Classification and Movement, DCI completes comprehensive assessments to determine each inmate's program needs, custody level, and placement; it received its first inmates in 1978 and handled female reception until that function moved to Taycheedah in December 2004.", aerial: "https://www.google.com/maps/place/Dodge+Correctional+Institute/@43.6286955,-88.7429612,690a,35y,145.42h,36.96t/data=!3m1!1e3!4m6!3m5!1s0x88041ccbf4846de9:0x7dd9bd8453ec176d!8m2!3d43.6242095!4d-88.7396903!16s%2Fm%2F07s7hln!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/DodgeCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/9/90/Entrance_to_Dodge_Correctional_Institution_01.jpg" },
+  { name: "Fox Lake Correctional Institution", phone: "(920) 928-3151", county: "Dodge County", addr: "W10237 Lake Emily Road, Fox Lake, WI 53933", lat: 43.6148, lon: -88.9133, security: "Medium", gender: "Male", yearOpened: "1962", population: "~1,365 (2024); capacity ~979", description: "A medium-security state prison for men, notable as the facility housing Steven Avery of the Netflix documentary 'Making a Murderer.'", details: "It offers technical training in automotive maintenance, cabinetmaking, computer drafting, horticulture, machining, small-engine technology, welding, HVAC, and masonry, plus post-secondary diploma and certificate programs through Moraine Park Technical College and cognitive-intervention and reentry programming.", aerial: "https://www.google.com/maps/place/Fox+Lake+Correctional+Institution/@43.6133468,-88.9058346,370a,35y,283.25h,55.04t/data=!3m1!1e3!4m6!3m5!1s0x8806a590e1748385:0x56a069254cfa0cd4!8m2!3d43.6149518!4d-88.9130011!16s%2Fg%2F11cpj0_h24!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/FoxLakeCorrectionalInstitution.aspx", image: "images/fox-lake.jpg" },
+  { name: "Green Bay Correctional Institution", phone: "(920) 432-4877", county: "Brown County", addr: "2833 Riverside Drive, Green Bay, WI 54307", lat: 44.4710, lon: -88.0380, security: "Maximum", gender: "Male", yearOpened: "1898", population: "~1,008 (Aug 2020); design capacity ~749", description: "One of Wisconsin's oldest maximum-security prisons, opened in 1898 as the Wisconsin State Reformatory and renamed Green Bay Correctional Institution in 1979.", details: "It provides vocational training in cabinetry, construction trades, barbering, graphic arts, and masonry plus treatment for substance abuse, anger management, and sex offenders; the aging facility is slated for closure under a bipartisan-backed state realignment plan targeting completion by the end of 2029.", aerial: "https://www.google.com/maps/place/2833+Riverside+Dr,+Allouez,+WI+54301/@44.4698121,-88.0318101,281a,35y,275.69h,54.93t/data=!3m1!1e3!4m6!3m5!1s0x8802fb6e0a176939:0x64ee09c49f69716!8m2!3d44.4703636!4d-88.03692!16s%2Fg%2F11bw3hq042!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/GreenBayCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/8/82/Wisconsin_State_Reformatory.jpg" },
+  { name: "Jackson Correctional Institution", phone: "(715) 284-4550", county: "Jackson County", addr: "N6500 Haipek Road, Black River Falls, WI 54615", lat: 44.3070, lon: -90.7890, security: "Medium", gender: "Male", yearOpened: "1996", population: "~1,003 (2023); op. capacity ~837", description: "A medium-security adult male prison in rural Jackson County that began receiving inmates in May 1996 and operates above its design capacity.", details: "It offers academic programs (ABE, GED, HSED) and vocational training through Western Technical College in food production, cabinetry, construction, barbering, and masonry, and runs a Badger State Industries shop where inmates manufacture and refurbish highway signs for the state DOT.", aerial: "https://www.google.com/maps/@44.308111,-90.79841,415a,35y,116.78h,54.68t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/JacksonCorrectionalInstitution.aspx", image: "images/jackson.jpg" },
+  { name: "Kettle Moraine Correctional Institution", phone: "(920) 526-3244", county: "Sheboygan County", addr: "W9071 Forest Drive, Plymouth, WI 53073", lat: 43.7175, lon: -88.1506, security: "Medium", gender: "Male", yearOpened: "1962 (adult since 1974)", population: "~1,182 (FY2019); op. capacity ~1,187", description: "A medium-security adult male prison near Plymouth that originally opened in 1962 as a juvenile boys' school before converting to an adult institution in 1974.", details: "It provides vocational training in barbering/cosmetology, cabinet making, computer-aided drafting, custodial skills, masonry, and welding, with students earning college certificates and technical diplomas; a DOC job center opened inside the facility in January 2022 offering reentry job-search services to those within 60 days of release.", aerial: "https://www.google.com/maps/place/Kettle+Moraine+Correctional+Institution/@43.7174577,-88.1600958,464a,35y,67.75h,58.26t/data=!3m1!1e3!4m6!3m5!1s0x88049d0c94678e3d:0xea6f120d69d037a0!8m2!3d43.7235031!4d-88.1491317!16s%2Fm%2F0gfhrnt!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/KettleMoraineCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/e/e2/Kettle_Moraine_Correctional_Institution.jpg" },
+  { name: "Milwaukee Secure Detention Facility", phone: "(414) 212-3535", county: "Milwaukee County", addr: "1015 N. 10th St., Milwaukee, WI 53205", lat: 43.0437, lon: -87.9250, security: "Medium", gender: "Both", yearOpened: "2001", population: "~1,040 (capacity; ~40 female beds)", description: "A medium-security high-rise detention facility in downtown Milwaukee, used largely for probation/parole holds and short-term detainees, including a small female unit.", details: "It provides short-term sanction programming, substance-use disorder treatment, Thinking for a Change, and domestic-violence programs, with roughly 210 beds dedicated to AODA programming focused on Alternatives to Revocation, alongside Adult Basic Education and GED study.", aerial: "https://www.google.com/maps/place/Milwaukee+Secure+Detention+Facility/@43.0436833,-87.930405,220a,35y,89.27h,65.38t/data=!3m1!1e3!4m6!3m5!1s0x88051979e85c6b51:0x3b7e7022d1c1f526!8m2!3d43.0434105!4d-87.9246495!16s%2Fg%2F11cr_7641s!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/MilwaukeeSecureDetentionFacility.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Milwaukee_Secure_Detention_Facility.jpg" },
+  { name: "New Lisbon Correctional Institution", phone: "(608) 562-6400", county: "Juneau County", addr: "2000 Progress Road, New Lisbon, WI 53950", lat: 43.8816, lon: -90.1321, security: "Medium", gender: "Male", yearOpened: "2002", population: "~950–1,200 (sources conflict)", description: "A medium-security state prison for men in Juneau County, built 2001–2002 on a 100-acre site.", details: "It offers academic and vocational education, with vocational training in horticulture and commercial baking certification plus post-secondary correspondence courses, and treatment/reentry programming covering substance abuse, domestic violence, sex-offender treatment, pre-release programming, and restorative justice.", aerial: "https://www.google.com/maps/@43.8775994,-90.1341593,440a,35y,32.62h,43.01t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/NewLisbonCorrectionalInstitution.aspx", image: "images/new-lisbon.jpg" },
+  { name: "Oakhill Correctional Institution", phone: "(608) 835-3101", county: "Dane County", addr: "5212 County Hwy. M, Oregon, WI 53575", lat: 42.9504, lon: -89.4007, security: "Minimum", gender: "Male", yearOpened: "1976", population: "~832 (FY2025); design capacity ~344", description: "A minimum-security adult male facility near Oregon focused on work release and pre-release programming; the campus originally opened in 1941 as the Wisconsin School for Girls.", details: "An itinerant DOC/Workforce Development job center inside the facility provides career-readiness, job-search, apprenticeship, and veterans services for community reentry, while work and technical training include a Badger State Industries upholstery/refinishing operation plus horticulture, food preparation, and construction trades.", aerial: "https://www.google.com/maps/place/Oakhill+Correctional+Institute/@42.9543257,-89.395078,305a,35y,206.36h,46.95t/data=!3m1!1e3!4m6!3m5!1s0x8807b34d83acf4dd:0x1b598106717fadcb!8m2!3d42.9582452!4d-89.395814!16s%2Fm%2F0765wlh!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/OakhillCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/5/58/Oakhill_Correctional_Institution.jpg" },
+  { name: "Oshkosh Correctional Institution", phone: "(920) 231-4010", county: "Winnebago County", addr: "1730 W. Snell Road, Oshkosh, WI 54903", lat: 44.0693, lon: -88.5616, security: "Medium", gender: "Male", yearOpened: "1986", population: "2,000+ recent; capacity ~1,494", description: "One of Wisconsin's largest medium-security prisons, opened in 1986 north of downtown Oshkosh, housing adult male offenders.", details: "It offers vocational training in culinary arts, building maintenance/construction, Braille transcription, and computer skills, plus extensive treatment including a Dual Diagnosis (MICA) program, a Secure Residential Treatment Unit, and a 36-month sex-offender treatment program; reentry offerings include the Earned Release Program and Windows to Work.", aerial: "https://www.google.com/maps/place/Oshkosh+Correctional+Institution/@44.0632459,-88.5654001,512a,35y,34.02h,61.5t/data=!3m1!1e3!4m6!3m5!1s0x8803e9f360f04935:0x6075c07ec3a53ba4!8m2!3d44.0692813!4d-88.5615462!16s%2Fm%2F0j9l9hr!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/OshkoshCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Oshkosh_Correctional_Institution_-_panoramio.jpg/500px-Oshkosh_Correctional_Institution_-_panoramio.jpg" },
+  { name: "Prairie du Chien Correctional Institution", phone: "(608) 326-7828", county: "Crawford County", addr: "500 E. Parrish St., Prairie du Chien, WI 53821", lat: 43.0330, lon: -91.1411, security: "Minimum", gender: "Male", yearOpened: "1997 (minimum since 2021)", population: "op. capacity ~512", description: "Originally a medium-security youthful-offender facility opened in 1997; transitioned to a minimum-security institution for adult males in May 2021.", details: "The conversion to minimum security expanded the institution's project crews and work-release opportunities, letting incarcerated men work in the community to build job skills, pay restitution, and save for reentry, with education and treatment programming also provided.", aerial: "https://www.google.com/maps/place/Prairie+Du+Chien+Correctional+Institution/@43.0365367,-91.1436223,584a,35y,146.66h,33.44t/data=!3m1!1e3!4m6!3m5!1s0x87fc836730e8ed6b:0x79c791fddd4e8ea6!8m2!3d43.0342492!4d-91.1410106!16s%2Fg%2F1tdmffwz!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/PrairieduChienCorrectionalInstitution.aspx", image: "images/prairie-du-chien.jpg" },
+  { name: "Racine Correctional Institution", phone: "(262) 886-3214", county: "Racine County", addr: "2019 Wisconsin St., Sturtevant, WI 53177", lat: 42.7099, lon: -87.9008, security: "Medium", gender: "Male", yearOpened: "1991", population: "~1,610 (June 2023)", description: "A medium-security prison for adult men in Sturtevant that opened in 1991; includes the adjacent minimum-security Sturtevant Transitional Facility.", details: "It offers GED courses, vocational maintenance training in partnership with Gateway Technical College, and cognitive and behavioral programs such as anger management and Thinking for a Change, and operates the Beacon sex-offender treatment program.", aerial: "https://www.google.com/maps/place/Racine+Correctional+Institution/@42.7052583,-87.8984569,387a,35y,328.75h,55.99t/data=!3m1!1e3!4m6!3m5!1s0x88056892b07f5d99:0xdc1455441fcb016!8m2!3d42.7087936!4d-87.9039467!16s%2Fg%2F11c1nqjc8p!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/RacineCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/RacineCorrectionalInstitution.JPG/330px-RacineCorrectionalInstitution.JPG" },
+  { name: "Racine Youthful Offender Correctional Facility", phone: "(262) 638-1999", county: "Racine County", addr: "1501 Albert St., Racine, WI 53404", lat: 42.7366, lon: -87.7994, security: "Medium", gender: "Male", yearOpened: "—", population: "capacity ~450", description: "A medium-security facility in the city of Racine dedicated to male offenders ages 18 through 24 sentenced through the adult courts.", details: "Wisconsin's first institution placed in an urban core and designated for a specific age group, it offers vocational training in custodial, masonry, microcomputer (Microsoft certification), and C-Tech, plus substance-use, anger management, domestic violence, and Thinking for a Change programming.", aerial: "https://www.google.com/maps/place/Racine+Youthful+Offender+Correctional+Facility/@42.7346837,-87.8036953,312a,35y,53.53h,52.8t/data=!3m1!1e3!4m6!3m5!1s0x880543bce9fd043b:0xe9c222dab67b5b2!8m2!3d42.7369827!4d-87.7993116!16s%2Fg%2F1tgpnlt1!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/RacineYouthfulOffenderCorrectionalFacility.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Racine_October_2023_014_%28Racine_Youthful_Offender_Correctional_Facility%29.jpg/330px-Racine_October_2023_014_%28Racine_Youthful_Offender_Correctional_Facility%29.jpg" },
+  { name: "Redgranite Correctional Institution", phone: "(920) 566-2600", county: "Waushara County", addr: "1006 County Road EE, Redgranite, WI 54970", lat: 44.0536, lon: -89.1086, security: "Medium", gender: "Male", yearOpened: "2001", population: "~1,033 (2025); op. capacity ~990", description: "A medium-security prison for adult men that received its first inmates in January 2001 on an 89-acre site in Waushara County.", details: "It provides tiered academic education (ABE/GED/HSED), vocational programs in Bakery Fundamentals and Industrial Maintenance Mechanic through Fox Valley Technical College, reentry services like Windows to Work, and a Badger State Industries operation handling electronics and wheelchair recycling.", aerial: "https://www.google.com/maps/place/Redgranite+Correctional+Institute/@44.0568192,-89.1000828,579a,35y,240.86h,50.65t/data=!3m1!1e3!4m6!3m5!1s0x8801155f94ca120f:0xf549c94affabad24!8m2!3d44.0537864!4d-89.1075754!16zL20vMDhtajA5!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/RedgraniteCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/RGCI_2024.jpg/330px-RGCI_2024.jpg" },
+  { name: "Stanley Correctional Institution", phone: "(715) 644-2960", county: "Chippewa County", addr: "100 Corrections Drive, Stanley, WI 54768", lat: 44.9490, lon: -90.9551, security: "Medium", gender: "Male", yearOpened: "2001", population: "~1,500 (op. capacity)", description: "A medium-security state prison for men in Chippewa County, built by a private developer in the late 1990s and purchased by Wisconsin, opening as a state facility in 2001.", details: "It offers vocational training (custodial, Microsoft Office, CAD, and welding) certified through Chippewa Valley Technical College and, beginning fall 2024, hosts a UW-Stout bachelor's degree program; its SCOPES program crafts donated items for the community.", aerial: "https://www.google.com/maps/@44.9525621,-90.9563947,252a,35y,166.44h,58.64t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/StanleyCorrectionalInstitution.aspx", image: "images/stanley.jpg" },
+  { name: "Sturtevant Transitional Facility", phone: "(262) 884-2410", county: "Racine County", addr: "9351 Rayne Road, Sturtevant, WI 53177", lat: 42.7140, lon: -87.8984, security: "Minimum / Medium", gender: "Male", yearOpened: "2003", population: "304 (capacity)", description: "A transitional facility for adult men operated as a unit of Racine Correctional Institution, with minimum- (2003) and medium-security (2004) units.", details: "Its 152-bed minimum-security unit focuses on work and study release, averaging about 60 community workers weekly who work locally by day and return nightly, and all minimum-security residents must hold a job assignment or serve on project crews.", aerial: "https://www.google.com/maps/place/Sturtevant+Transitional+Facility/@42.7105699,-87.8975915,191a,35y,338.65h,54.97t/data=!3m1!1e3!4m6!3m5!1s0x880568f6af1c99c1:0x61525e866668dda1!8m2!3d42.7131259!4d-87.8987349!16s%2Fg%2F1tfdf0tg!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/SturtevantTransitionalFacility.aspx", image: "images/sturtevant.jpg" },
+  { name: "Waupun Correctional Institution", phone: "(920) 324-5571", county: "Dodge County", addr: "200 S. Madison Street, Waupun, WI 53963", lat: 43.6296, lon: -88.7314, security: "Maximum", gender: "Male", yearOpened: "1851", population: "~965 (FY2022-23); op. capacity ~1,064", description: "The oldest prison in Wisconsin, this maximum-security facility for men opened in 1851 as the Wisconsin State Prison and was renamed Waupun Correctional Institution in 1977.", details: "Wisconsin's largest maximum-security men's prison, it operates a Behavioral Health Unit for those with mental illness and offers academic classes, vocational training in construction trades and welding, a 1998 health complex, and Badger State Industries work assignments.", aerial: "https://www.google.com/maps/place/Waupun+Correctional+Institution/@43.6313058,-88.7275805,618a,35y,240.39h,27.42t/data=!3m1!1e3!4m6!3m5!1s0x88041ccac6c09e73:0xb7ce8d27eb0354cf!8m2!3d43.6296869!4d-88.7315889!16zL20vMGRxcWhn!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/WaupunCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/6/6d/Wisconsin_State_Prison_Exterior.jpg" },
+  { name: "Wisconsin Secure Program Facility", phone: "(608) 375-5656", county: "Grant County", addr: "1101 Morrison Drive, Boscobel, WI 53805", lat: 43.1431, lon: -90.6831, security: "Maximum", gender: "Male", yearOpened: "1999", population: "~372 (Nov 2022); capacity ~500", description: "Originally the Supermax Correctional Institution, this maximum-custody facility in Boscobel houses Wisconsin's most disruptive and high-security male inmates.", details: "With about 500 beds, it manages high-risk maximum-custody men across general population, restrictive housing, and administrative confinement units, offering cognitive-focused programming including Cognitive Interventions, anger management, Dialectical Behavior Therapy modules, and Thinking for a Change.", aerial: "https://www.google.com/maps/place/Wisconsin+Secure+Program+Facility/@43.1383598,-90.6838555,304a,35y,7.1h,57.48t/data=!3m1!1e3!4m6!3m5!1s0x87fcf8d10080fb87:0xaf2d37adf57e5272!8m2!3d43.1432007!4d-90.682973!16s%2Fm%2F0dljtk3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/WisconsinSecureProgramFacility.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/1/12/Wisconsin_Secure_Program_Facility.png" }
+];
+
+// Base layers: clean street map + Esri aerial imagery (with place/road labels overlaid).
+const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+});
+const satellite = L.layerGroup([
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Imagery &copy; Esri, Maxar, Earthstar Geographics', maxZoom: 19
+  }),
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
+]);
+
+const map = L.map('map', { layers: [streets] }).setView([44.5, -89.8], 7);
+L.control.layers({ 'Map': streets, 'Satellite': satellite }, null, { position: 'topright' }).addTo(map);
+
+// Facility markers encode SECURITY LEVEL by shape + color, with a cell-block glyph.
+// (Drive time is encoded separately, on the routes / bubbles / result cards.)
+const SEC_SHAPES = {
+  circ: '<circle cx="16" cy="16" r="13" fill="currentColor" stroke="#fff" stroke-width="2.5"/>',
+  sq:   '<rect x="3" y="3" width="26" height="26" rx="6" fill="currentColor" stroke="#fff" stroke-width="2.5"/>',
+  tri:  '<path d="M16 2.5 L29.5 28 L2.5 28 Z" fill="currentColor" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>',
+  diam: '<path d="M16 2 L30 16 L16 30 L2 16 Z" fill="currentColor" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>'
+};
+const SEC_GLYPH = '<rect x="11" y="12.5" width="10" height="8.5" rx="1" fill="#fff"/>'
+  + '<g fill="currentColor"><rect x="12.7" y="14.3" width="1.5" height="4.7"/><rect x="15.25" y="14.3" width="1.5" height="4.7"/><rect x="17.8" y="14.3" width="1.5" height="4.7"/></g>';
+
+// Highest level present wins, so a single marker reads cleanly (e.g. "Maximum (mixed)" -> Maximum).
+function securityOf(f) {
+  const s = (f.security || '').toLowerCase();
+  if (s.includes('maximum')) return { key: 'max',   label: 'Maximum', color: '#e03131', shape: 'tri'  };
+  if (s.includes('medium'))  return { key: 'med',   label: 'Medium',  color: '#1c7ed6', shape: 'sq'   };
+  if (s.includes('minimum')) return { key: 'min',   label: 'Minimum', color: '#2f9e44', shape: 'circ' };
+  return                            { key: 'other', label: 'Other',   color: '#5c6b7a', shape: 'diam' };
+}
+
+// emphasis = true for facilities in the current results (drawn larger).
+function facilityIcon(f, emphasis) {
+  const sec = securityOf(f);
+  const size = emphasis ? 34 : 26;
+  const html = `<svg width="${size}" height="${size}" viewBox="0 0 32 32" style="color:${sec.color}">${SEC_SHAPES[sec.shape]}${SEC_GLYPH}</svg>`;
+  return L.divIcon({
+    className: 'fac-mk' + (emphasis ? ' emph' : ''),
+    html, iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2]
+  });
+}
+
+// Distinctive teardrop pin for the entered address (with a pulsing ring via CSS).
+const originIcon = () => L.divIcon({
+  className: 'origin-pin',
+  html: `<svg width="34" height="44" viewBox="0 0 34 44" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17 2C9 2 2.5 8.5 2.5 16.5 2.5 27 17 42 17 42S31.5 27 31.5 16.5C31.5 8.5 25 2 17 2z" fill="#7c3aed" stroke="#fff" stroke-width="2.5"/>
+    <circle cx="17" cy="16.5" r="5.5" fill="#fff"/>
+  </svg>`,
+  iconSize: [34, 44], iconAnchor: [17, 42], popupAnchor: [0, -38]
+});
+
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function popupHtml(f) {
+  const imgPart = f.image
+    ? `<img src="${f.image}" alt="${esc(f.name)}" onerror="this.outerHTML='<div class=&quot;noimg&quot;></div>'" />`
+    : `<div class="noimg"></div>`;
+  const row = (label, val) => val ? `<dt>${label}</dt><dd>${esc(val)}</dd>` : '';
+  const aerialUrl = f.aerial || `https://www.google.com/maps/@${f.lat},${f.lon},300a,35y,45h,62t/data=!3m1!1e3`;
+  return `<div class="fac-pop">
+    ${imgPart}
+    <div class="body">
+      <h3>${esc(f.name)}</h3>
+      <p class="paddr">${esc(f.addr)}</p>
+      <dl class="meta">
+        ${row('Security', f.security)}
+        ${row('Houses', f.gender)}
+        ${row('County', f.county)}
+        ${row('Opened', f.yearOpened)}
+        ${row('Population', f.population)}
+        ${f.phone ? `<dt>Phone</dt><dd><a href="tel:${f.phone.replace(/[^0-9]/g,'')}">${esc(f.phone)}</a></dd>` : ''}
+      </dl>
+      <p class="desc">${esc(f.description)}</p>
+      ${f.details ? `<p class="desc">${esc(f.details)}</p>` : ''}
+      <div class="links">
+        <a class="gov" href="${f.url}" target="_blank" rel="noopener">Official WIDOC page &rarr;</a>
+        <a class="gov" href="${aerialUrl}" target="_blank" rel="noopener">Aerial 3D view &#8599;</a>
+        <a class="gov" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ', ' + f.addr)}" target="_blank" rel="noopener">Open in Maps &#8599;</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+const nameLabels = [];
+const markers = FACILITIES.map((f, i) => {
+  const m = L.marker([f.lat, f.lon], { icon: facilityIcon(f, false) }).addTo(map);
+  m.bindTooltip(`<b>${esc(f.name)}</b><br>${esc(f.addr)}`, { direction: 'top', offset: [0,-15], opacity: 0.95 });
+  m.bindPopup(popupHtml(f), { maxWidth: 300, minWidth: 300, autoPan: true });
+  m.on('click', () => { if (routeByIdx[i]) highlightRoute(i); else map.flyTo([f.lat, f.lon], 13); });
+  // faint always-visible name label below the circle (toggled by zoom + filters)
+  nameLabels[i] = L.tooltip({ permanent: true, direction: 'bottom', className: 'fac-name-label', offset: [0, 15], interactive: false })
+    .setLatLng([f.lat, f.lon]).setContent(esc(f.name));
+  return m;
+});
+
+// ---- Filter by security level / gender ----
+const LABEL_MIN_ZOOM = 10;
+let passesFilter = FACILITIES.map(() => true);
+
+function secCategories(s) {
+  s = (s || '').toLowerCase();
+  const cats = [];
+  if (s.includes('minimum')) cats.push('Minimum');
+  if (s.includes('medium')) cats.push('Medium');
+  if (s.includes('maximum')) cats.push('Maximum');
+  return cats;
+}
+function readFilters() {
+  return {
+    secs: [...document.querySelectorAll('.f-sec:checked')].map(c => c.value),
+    gens: [...document.querySelectorAll('.f-gen:checked')].map(c => c.value)
+  };
+}
+function facilityPasses(f, filt) {
+  const cats = secCategories(f.security);
+  const secOk = cats.length === 0 ? true : cats.some(c => filt.secs.includes(c));
+  const genOk = f.gender === 'Both'
+    ? (filt.gens.includes('Male') || filt.gens.includes('Female'))
+    : filt.gens.includes(f.gender);
+  return secOk && genOk;
+}
+function refreshLabels() {
+  const showZoom = map.getZoom() >= LABEL_MIN_ZOOM;
+  nameLabels.forEach((lab, i) => {
+    const show = showZoom && passesFilter[i];
+    if (show && !map.hasLayer(lab)) lab.addTo(map);
+    else if (!show && map.hasLayer(lab)) map.removeLayer(lab);
+  });
+}
+function applyFilters() {
+  const filt = readFilters();
+  FACILITIES.forEach((f, i) => {
+    passesFilter[i] = facilityPasses(f, filt);
+    if (passesFilter[i] && !map.hasLayer(markers[i])) markers[i].addTo(map);
+    else if (!passesFilter[i] && map.hasLayer(markers[i])) map.removeLayer(markers[i]);
+  });
+  refreshLabels();
+  const shown = passesFilter.filter(Boolean).length;
+  const badge = document.getElementById('filtCount');
+  if (badge) badge.textContent = `${shown} of ${FACILITIES.length} shown`;
+}
+map.on('zoomend', refreshLabels);
+document.querySelectorAll('.f-sec, .f-gen').forEach(c => c.addEventListener('change', applyFilters));
+applyFilters();
+
+let originMarker = null;
+let routeLayerGroup = L.layerGroup().addTo(map);
+let routeByIdx = {}; // facility index -> { layer, label, color }
+
+// Drive-time color scoring — green <45, yellow 45–75, orange 75–120, red >120.
+// `key` maps to a .rl-* CSS class; `color` is used for route lines & markers.
+function driveBucket(min) {
+  if (min < 45)  return { key: 'g', color: '#1e9e4a', text: '#fff' };
+  if (min < 75)  return { key: 'y', color: '#f2c200', text: '#3a2f00' };
+  if (min < 120) return { key: 'o', color: '#ec7a1c', text: '#fff' };
+  return           { key: 'r', color: '#d6361f', text: '#fff' };
+}
+
+function setRouteStyles(i) {
+  Object.entries(routeByIdx).forEach(([k, r]) => {
+    const sel = (+k === i);
+    r.casing?.setStyle({ weight: sel ? 13 : 10, opacity: sel ? 1 : 0.85 });
+    r.layer.setStyle({ color: r.color, weight: sel ? 8 : 6, opacity: sel ? 1 : 0.92 });
+    if (sel) { r.casing?.bringToFront(); r.layer.bringToFront(); }
+    const el = r.label?.getElement();
+    if (el) el.classList.toggle('sel', sel);
+  });
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('active', +c.dataset.idx === i));
+}
+
+// Style + zoom to fit a single route (origin + facility included in its geometry).
+function highlightRoute(i) {
+  setRouteStyles(i);
+  const r = routeByIdx[i];
+  if (r) map.fitBounds(r.layer.getBounds().pad(0.18));
+}
+
+async function getRoute(oLat, oLon, f) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${oLon},${oLat};${f.lon},${f.lat}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  const j = await res.json();
+  if (!j.routes || !j.routes.length) throw new Error('no route');
+  const rt = j.routes[0];
+  return {
+    coords: rt.geometry.coordinates.map(c => [c[1], c[0]]),
+    miles: rt.distance / 1609.34,
+    min: rt.duration / 60
+  };
+}
+
+function haversineMiles(lat1, lon1, lat2, lon2) {
+  const R = 3958.8, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+const statusEl = document.getElementById('status');
+const resultsEl = document.getElementById('results');
+const DEFAULT_STATUS = statusEl.innerHTML; // restored by "Reset map"
+
+function setStatus(msg, isError) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status' + (isError ? ' error' : '');
+  statusEl.style.display = msg ? 'block' : 'none';
+}
+
+const CANDIDATE_COUNT = 10;  // route this many nearest; the "Show" control picks how many to display
+let lastRouted = null;       // routed candidates from the most recent search (reused by renderResults)
+let lastGeo = null;          // { display_name, lat, lon } of the entered address
+
+const addrInput = document.getElementById('addr');
+const resCountEl = document.getElementById('resCount');
+const resSortEl = document.getElementById('resSort');
+const resultControls = document.getElementById('resultControls');
+
+document.getElementById('searchForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideSuggestions();
+  const query = addrInput.value.trim();
+  if (!query) return;
+  setStatus('Looking up address…', false);
+  resultsEl.innerHTML = '';
+  resultControls.style.display = 'none';
+
+  let geo;
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q='
+      + encodeURIComponent(query + ', Wisconsin');
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    geo = await res.json();
+  } catch (err) {
+    setStatus('Could not reach the geocoding service. Check your internet connection.', true);
+    return;
+  }
+  if (!geo || !geo.length) {
+    setStatus(`Couldn't find "${query}". Try adding a city or ZIP code.`, true);
+    return;
+  }
+  runSearch(parseFloat(geo[0].lat), parseFloat(geo[0].lon), geo[0].display_name);
+});
+
+// Place the origin, fetch driving routes to the nearest facilities, then render.
+async function runSearch(oLat, oLon, displayName) {
+  markers.forEach((m, i) => m.setIcon(facilityIcon(FACILITIES[i], false)));
+  routeLayerGroup.clearLayers();
+  routeByIdx = {};
+  if (originMarker) map.removeLayer(originMarker);
+  originMarker = L.marker([oLat, oLon], { icon: originIcon() })
+    .addTo(map).bindTooltip(`<b>Entered address</b><br>${esc(displayName)}`, { direction:'top', offset:[0,-36] });
+  recordRecent(displayName, oLat, oLon);
+
+  const candidates = FACILITIES
+    .map((f, i) => ({ f, i, dist: haversineMiles(oLat, oLon, f.lat, f.lon) }))
+    .filter(c => passesFilter[c.i])
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, CANDIDATE_COUNT);
+
+  if (!candidates.length) {
+    setStatus('No facilities match the current filters. Adjust the filter and search again.', true);
+    return;
+  }
+
+  setStatus('Calculating fastest driving routes…', false);
+
+  const routed = await Promise.all(candidates.map(async c => {
+    try {
+      const rt = await getRoute(oLat, oLon, c.f);
+      return { ...c, miles: rt.miles, min: rt.min, coords: rt.coords, routed: true };
+    } catch (e) {
+      // fallback: straight-line estimate, no drawn route
+      return { ...c, miles: c.dist, min: Math.round(c.dist / 45 * 60), coords: null, routed: false };
+    }
+  }));
+
+  const anyRouted = routed.some(r => r.routed);
+  setStatus(anyRouted ? '' : 'Routing service unavailable — showing straight-line estimates.', !anyRouted);
+
+  lastRouted = routed;
+  lastGeo = { display_name: displayName, lat: oLat, lon: oLon };
+  resultControls.style.display = 'flex';
+  renderResults();
+}
+
+// Draw markers/routes/cards for the chosen count + sort order. Pure re-render —
+// reuses lastRouted, so the Show/Sort controls never trigger new network calls.
+function renderResults() {
+  if (!lastRouted) return;
+  const count = +resCountEl.value;
+  const sortKey = resSortEl.value; // 'min' (drive time) | 'miles' (distance)
+  const ranked = [...lastRouted].sort((a, b) => sortKey === 'miles' ? a.miles - b.miles : a.min - b.min);
+  const show = ranked.slice(0, count);
+
+  markers.forEach((m, i) => m.setIcon(facilityIcon(FACILITIES[i], false)));
+  routeLayerGroup.clearLayers();
+  routeByIdx = {};
+  resultsEl.innerHTML = '';
+
+  const originDiv = document.createElement('div');
+  originDiv.className = 'origin';
+  originDiv.innerHTML = `Closest institutions to:<br><b>${esc(lastGeo.display_name)}</b>`;
+  resultsEl.appendChild(originDiv);
+
+  const topLabel = sortKey === 'miles' ? 'closest' : 'fastest';
+
+  // Routes: a white casing under a colored line so they pop against the basemap.
+  show.forEach((r, idx) => {
+    const bucket = driveBucket(r.min);
+    markers[r.i].setIcon(facilityIcon(r.f, true));
+    if (r.coords) {
+      const casing = L.polyline(r.coords, { color: '#fff', weight: 10, opacity: 0.85 });
+      const line = L.polyline(r.coords, { color: bucket.color, weight: 6, opacity: 0.92 });
+      const mid = r.coords[Math.floor(r.coords.length / 2)];
+      const labelText = `~${Math.round(r.min)} min${idx === 0 ? ' · ' + topLabel : ''}`;
+      const label = L.tooltip({ permanent: true, direction: 'center', className: 'route-label rl-' + bucket.key, interactive: true })
+        .setLatLng(mid).setContent(labelText);
+      routeLayerGroup.addLayer(casing);
+      routeLayerGroup.addLayer(line);
+      routeLayerGroup.addLayer(label);
+      routeByIdx[r.i] = { layer: line, casing, label, color: bucket.color };
+      line.on('click', () => highlightRoute(r.i));
+      label.on('click', () => highlightRoute(r.i));
+    }
+  });
+
+  show.forEach((r, idx) => {
+    const miles = r.miles.toFixed(1);
+    const mins = Math.round(r.min);
+    const bucket = driveBucket(r.min);
+    const chip = `<span class="tchip" style="background:${bucket.color};color:${bucket.text}">~${mins} min</span>`;
+    const label = r.routed
+      ? `<b>${miles} mi</b> &middot; ${chip} drive`
+      : `<b>${miles} mi</b> straight-line &middot; ${chip} est.`;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.dataset.idx = r.i;
+    card.innerHTML = `
+      <div><span class="rank" style="background:${bucket.color};color:${bucket.text}">${idx+1}</span><span class="name">${esc(r.f.name)}</span></div>
+      <div class="addr">${esc(r.f.addr)}</div>
+      <div class="dist">${label}</div>`;
+    card.addEventListener('click', () => {
+      markers[r.i].openPopup();
+      if (routeByIdx[r.i]) highlightRoute(r.i);
+      else map.setView([r.f.lat, r.f.lon], 11);
+    });
+    resultsEl.appendChild(card);
+  });
+
+  // Default view: select #1, but fit all shown routes + the origin in frame.
+  if (Object.keys(routeByIdx).length) {
+    setRouteStyles(show[0].i);
+    const layers = [originMarker, ...Object.values(routeByIdx).map(r => r.layer)];
+    map.fitBounds(L.featureGroup(layers).getBounds().pad(0.15));
+  } else if (originMarker) {
+    const group = L.featureGroup([originMarker, ...show.map(r => markers[r.i])]);
+    map.fitBounds(group.getBounds().pad(0.25));
+  }
+}
+resCountEl.addEventListener('change', renderResults);
+resSortEl.addEventListener('change', renderResults);
+
+// ---- Address autocomplete (debounced Nominatim typeahead) ----
+const sugEl = document.getElementById('suggestions');
+let sugItems = [], sugActive = -1, sugTimer = null, sugController = null;
+
+function hideSuggestions() { sugEl.hidden = true; sugEl.innerHTML = ''; sugItems = []; sugActive = -1; }
+
+async function fetchSuggestions(q) {
+  if (sugController) sugController.abort();
+  sugController = new AbortController();
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&countrycodes=us&q='
+      + encodeURIComponent(q + ', Wisconsin');
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: sugController.signal });
+    const data = await res.json();
+    if (addrInput.value.trim().length < 3) return; // user cleared the box mid-request
+    sugItems = data || [];
+    sugActive = -1;
+    if (!sugItems.length) { hideSuggestions(); return; }
+    sugEl.innerHTML = sugItems.map((d, i) => {
+      const parts = d.display_name.split(', ');
+      const main = parts.slice(0, 2).join(', ');
+      const sub = parts.slice(2).join(', ');
+      return `<li data-i="${i}"><div class="s-main">${esc(main)}</div><div class="s-sub">${esc(sub)}</div></li>`;
+    }).join('');
+    sugEl.hidden = false;
+  } catch (e) { /* aborted or network error — leave the dropdown as-is */ }
+}
+
+addrInput.addEventListener('input', () => {
+  const q = addrInput.value.trim();
+  clearTimeout(sugTimer);
+  if (q.length < 3) { hideSuggestions(); return; }
+  sugTimer = setTimeout(() => fetchSuggestions(q), 350); // debounce; Nominatim asks for ≤1 req/sec
+});
+
+addrInput.addEventListener('keydown', (e) => {
+  if (sugEl.hidden || !sugItems.length) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); sugActive = Math.min(sugActive + 1, sugItems.length - 1); updateActiveSuggestion(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); sugActive = Math.max(sugActive - 1, 0); updateActiveSuggestion(); }
+  else if (e.key === 'Enter') { if (sugActive >= 0) { e.preventDefault(); chooseSuggestion(sugActive); } }
+  else if (e.key === 'Escape') { hideSuggestions(); }
+});
+
+function updateActiveSuggestion() {
+  [...sugEl.children].forEach((li, i) => li.classList.toggle('active', i === sugActive));
+}
+
+// mousedown (not click) so the selection lands before the input loses focus.
+sugEl.addEventListener('mousedown', (e) => {
+  const li = e.target.closest('li');
+  if (li) { e.preventDefault(); chooseSuggestion(+li.dataset.i); }
+});
+
+function chooseSuggestion(i) {
+  const d = sugItems[i];
+  if (!d) return;
+  addrInput.value = d.display_name;
+  hideSuggestions();
+  runSearch(parseFloat(d.lat), parseFloat(d.lon), d.display_name); // reuse the suggestion's coords — no second geocode
+}
+
+document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) hideSuggestions(); });
+
+// Clear a search and return everything to its starting state.
+function resetMap() {
+  addrInput.value = '';
+  hideSuggestions();
+  resultsEl.innerHTML = '';
+  resultControls.style.display = 'none';
+  resCountEl.value = '3';
+  resSortEl.value = 'min';
+  lastRouted = null;
+  lastGeo = null;
+  markers.forEach((m, i) => { m.setIcon(facilityIcon(FACILITIES[i], false)); m.closePopup(); });
+  routeLayerGroup.clearLayers();
+  routeByIdx = {};
+  if (originMarker) { map.removeLayer(originMarker); originMarker = null; }
+  document.querySelectorAll('.f-sec, .f-gen').forEach(c => { c.checked = true; });
+  applyFilters();
+  statusEl.innerHTML = DEFAULT_STATUS;
+  statusEl.className = 'status';
+  statusEl.style.display = 'block';
+  map.setView([44.5, -89.8], 7);
+}
+document.getElementById('resetBtn').addEventListener('click', resetMap);
+
+// ---- Recent searches (persisted in localStorage, last 5) ----
+const RECENT_KEY = 'widoc-recent';
+const recentEl = document.getElementById('recent');
+const recentChipsEl = document.getElementById('recentChips');
+
+function loadRecents() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; }
+  catch (e) { return []; } // localStorage may be unavailable (e.g. file://, privacy mode)
+}
+function saveRecents(list) {
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function recordRecent(display_name, lat, lon) {
+  let list = loadRecents().filter(r => r.display_name !== display_name); // dedupe, newest first
+  list.unshift({ display_name, lat, lon });
+  saveRecents(list.slice(0, 5));
+  renderRecents();
+}
+function renderRecents() {
+  const list = loadRecents();
+  if (!list.length) { recentEl.style.display = 'none'; return; }
+  recentEl.style.display = 'block';
+  recentChipsEl.innerHTML = '';
+  list.forEach(r => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = r.display_name.split(',').slice(0, 2).join(',');
+    chip.title = r.display_name;
+    chip.addEventListener('click', () => {
+      addrInput.value = r.display_name;
+      hideSuggestions();
+      runSearch(r.lat, r.lon, r.display_name);
+    });
+    recentChipsEl.appendChild(chip);
+  });
+}
+document.getElementById('clearRecent').addEventListener('click', () => { saveRecents([]); renderRecents(); });
+renderRecents();
+
+// ---- Browse all facilities (A–Z) ----
+const browseListEl = document.getElementById('browseList');
+FACILITIES
+  .map((f, i) => ({ f, i }))
+  .sort((a, b) => a.f.name.localeCompare(b.f.name))
+  .forEach(({ f, i }) => {
+    const item = document.createElement('div');
+    item.className = 'browse-item';
+    item.innerHTML = `<span class="bi-name">${esc(f.name)}</span><span class="bi-sub">${esc(f.security)}</span>`;
+    item.addEventListener('click', () => {
+      map.flyTo([f.lat, f.lon], 13);
+      // open the marker's popup if visible, else a standalone popup (e.g. when filtered out)
+      if (map.hasLayer(markers[i])) markers[i].openPopup();
+      else L.popup({ maxWidth: 300, minWidth: 300, autoPan: true }).setLatLng([f.lat, f.lon]).setContent(popupHtml(f)).openOn(map);
+    });
+    browseListEl.appendChild(item);
+  });
+</script>
+</body>
+</html>
