@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>WIDOC Adult Institution Locator</title>
+<title>CDCR Adult Institution Locator</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   :root {
@@ -101,8 +101,9 @@
   .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); border-color: var(--accent); }
   .card.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(26,115,232,.35); }
   .filters { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
-  .filt-row { display: flex; align-items: center; gap: 12px; font-size: 13px; margin: 4px 0; }
-  .filt-label { width: 60px; color: var(--muted); font-weight: 600; }
+  .filt-row { display: flex; align-items: flex-start; gap: 10px 12px; font-size: 13px; margin: 4px 0; flex-wrap: wrap; }
+  .filt-label { width: 60px; flex: none; color: var(--muted); font-weight: 600; padding-top: 1px; }
+  .filt-opts { display: flex; flex-wrap: wrap; gap: 4px 12px; }
   .filters label { cursor: pointer; user-select: none; white-space: nowrap; }
   .filters input { vertical-align: middle; margin-right: 3px; }
   .filt-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 8px; }
@@ -115,6 +116,8 @@
   }
   .card .name { font-weight: 600; font-size: 15px; vertical-align: middle; }
   .card .addr { color: var(--muted); font-size: 13px; margin: 6px 0 0 30px; }
+  .card .cmeta { color: var(--muted); font-size: 12px; margin: 4px 0 0 30px; }
+  .card .cmeta b { color: var(--ink); font-weight: 600; }
   .card .dist { font-size: 13px; margin: 6px 0 0 30px; }
   .card .dist b { color: var(--accent); font-size: 15px; }
   .tchip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-weight: 700; font-size: 12px; vertical-align: middle; }
@@ -141,12 +144,15 @@
   .browse-item:last-child { border-bottom: none; }
   .browse-item:hover { background: #eef3f9; }
   .browse-item .bi-name { font-weight: 600; }
-  .browse-item .bi-sub { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .browse-item .bi-sub { font-size: 11px; color: var(--muted); white-space: nowrap; text-align: right; }
   .legend {
     font-size: 13.5px; color: #3f4d59; margin-top: 16px;
     padding-top: 14px; border-top: 1px solid var(--line); line-height: 1.75;
   }
   .legend b { font-size: 15px; }
+  .leg-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 4px 0; }
+  .leg-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; }
+  .leg-item svg { vertical-align: middle; }
   .dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
   .disclaimer { font-style: italic; font-size: 12px; line-height: 1.55; color: var(--muted); }
 
@@ -171,7 +177,7 @@
     border-radius: 14px; padding: 2px 9px; font-size: 12px; font-weight: 600;
     box-shadow: 0 1px 4px rgba(0,0,0,.25); white-space: nowrap;
   }
-  /* drive-time color buckets — shared meaning across route bubbles, markers & cards */
+  /* drive-time color buckets — shared meaning across route bubbles & result cards */
   .route-label.rl-g { background: #1e9e4a; color: #fff; border-color: #178a40; }
   .route-label.rl-y { background: #f2c200; color: #3a2f00; border-color: #d4ab00; }
   .route-label.rl-o { background: #ec7a1c; color: #fff; border-color: #cf6810; }
@@ -188,7 +194,7 @@
   }
   .fac-name-label::before { display: none; }
 
-  /* facility markers (shape/color = security level) */
+  /* facility markers (color = security level, glyph = mission/type) */
   .fac-mk svg { display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
   .fac-mk.emph svg { filter: drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
 
@@ -208,10 +214,10 @@
 </head>
 <body>
 <header>
-  <h1>WIDOC Adult Institution Locator</h1>
+  <h1>CDCR Adult Institution Locator</h1>
   <form class="search" id="searchForm">
     <div class="search-wrap">
-      <input id="addr" type="text" placeholder="Enter a Wisconsin address, city, or ZIP…" autocomplete="off" />
+      <input id="addr" type="text" placeholder="Enter a California address, city, or ZIP…" autocomplete="off" />
       <ul id="suggestions" class="suggest" hidden></ul>
     </div>
     <button type="submit">Find closest</button>
@@ -221,17 +227,35 @@
 <div class="main">
   <div id="panel">
     <div class="filters">
-      <div class="filt-head">Filter facilities <span id="filtCount" class="filt-count">19 of 19</span></div>
+      <div class="filt-head">Filter facilities <span id="filtCount" class="filt-count">31 of 31</span></div>
       <div class="filt-row">
         <span class="filt-label">Security</span>
-        <label><input type="checkbox" class="f-sec" value="Minimum" checked> Min</label>
-        <label><input type="checkbox" class="f-sec" value="Medium" checked> Med</label>
-        <label><input type="checkbox" class="f-sec" value="Maximum" checked> Max</label>
+        <span class="filt-opts">
+          <label><input type="checkbox" class="f-sec" value="I" checked> I</label>
+          <label><input type="checkbox" class="f-sec" value="II" checked> II</label>
+          <label><input type="checkbox" class="f-sec" value="III" checked> III</label>
+          <label><input type="checkbox" class="f-sec" value="IV" checked> IV</label>
+          <label><input type="checkbox" class="f-sec" value="Reception" checked> Reception</label>
+        </span>
+      </div>
+      <div class="filt-row">
+        <span class="filt-label">Mission</span>
+        <span class="filt-opts">
+          <label><input type="checkbox" class="f-mis" value="gp" checked> Gen pop</label>
+          <label><input type="checkbox" class="f-mis" value="rc" checked> Reception</label>
+          <label><input type="checkbox" class="f-mis" value="wm" checked> Women&rsquo;s</label>
+          <label><input type="checkbox" class="f-mis" value="md" checked> Medical</label>
+          <label><input type="checkbox" class="f-mis" value="sa" checked> Substance</label>
+          <label><input type="checkbox" class="f-mis" value="cv" checked> Conserv.</label>
+          <label><input type="checkbox" class="f-mis" value="rh" checked> Reentry</label>
+        </span>
       </div>
       <div class="filt-row">
         <span class="filt-label">Houses</span>
-        <label><input type="checkbox" class="f-gen" value="Male" checked> Male</label>
-        <label><input type="checkbox" class="f-gen" value="Female" checked> Female</label>
+        <span class="filt-opts">
+          <label><input type="checkbox" class="f-gen" value="Male" checked> Male</label>
+          <label><input type="checkbox" class="f-gen" value="Female" checked> Female</label>
+        </span>
       </div>
     </div>
     <div class="recent" id="recent" style="display:none">
@@ -239,7 +263,7 @@
       <div class="chips" id="recentChips"></div>
     </div>
     <details class="browse" id="browseAll">
-      <summary>Browse all facilities (A&ndash;Z)</summary>
+      <summary>Browse all institutions (A&ndash;Z)</summary>
       <div class="browse-list" id="browseList"></div>
     </details>
     <div class="status" id="status">Enter an address above to find the closest adult institutions, or browse the full list below. Hover any marker for its name &amp; address; click a marker for full details and a photo.</div>
@@ -260,17 +284,11 @@
     </div>
     <div id="results"></div>
     <div class="legend">
-      <div style="margin-bottom:6px"><b style="color:var(--ink)">Security level</b> <span style="font-size:12.5px">— marker shape &amp; color</span></div>
-      <div>
-        <svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><circle cx="16" cy="16" r="13" fill="#2f9e44" stroke="#fff" stroke-width="2.5"/></svg> Minimum
-        &nbsp;<svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><rect x="3" y="3" width="26" height="26" rx="6" fill="#1c7ed6" stroke="#fff" stroke-width="2.5"/></svg> Medium
-      </div>
-      <div>
-        <svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><path d="M16 2.5 L29.5 28 L2.5 28 Z" fill="#e03131" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg> Maximum
-        &nbsp;<svg width="16" height="16" viewBox="0 0 32 32" style="vertical-align:middle;margin-right:5px"><path d="M16 2 L30 16 L16 30 L2 16 Z" fill="#5c6b7a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg> Other
-      </div>
-      <div style="margin-top:4px;font-size:12.5px">Each marker has a cell-block glyph; result facilities are enlarged.</div>
-      <div style="margin-top:10px"><svg width="15" height="19" viewBox="0 0 34 44" style="vertical-align:middle;margin-right:5px"><path d="M17 2C9 2 2.5 8.5 2.5 16.5 2.5 27 17 42 17 42S31.5 27 31.5 16.5C31.5 8.5 25 2 17 2z" fill="#7c3aed" stroke="#fff" stroke-width="2.5"/><circle cx="17" cy="16.5" r="5.5" fill="#fff"/></svg> Entered address</div>
+      <div style="margin-bottom:4px"><b style="color:var(--ink)">Security level</b> <span style="font-size:12.5px">— marker color (highest level housed)</span></div>
+      <div id="secLegend" class="leg-row"></div>
+      <div style="margin-top:10px;margin-bottom:4px"><b style="color:var(--ink)">Mission / type</b> <span style="font-size:12.5px">— marker glyph</span></div>
+      <div id="missionLegend" class="leg-row"></div>
+      <div style="margin-top:10px"><svg width="15" height="19" viewBox="0 0 34 44" style="vertical-align:middle;margin-right:5px"><path d="M17 2C9 2 2.5 8.5 2.5 16.5 2.5 27 17 42 17 42S31.5 27 31.5 16.5C31.5 8.5 25 2 17 2z" fill="#7c3aed" stroke="#fff" stroke-width="2.5"/><circle cx="17" cy="16.5" r="5.5" fill="#fff"/></svg> Entered address &middot; result facilities are enlarged</div>
       <div style="margin-top:10px">
         <b style="color:var(--ink)">Drive time</b> <span style="font-size:12.5px">— routes &amp; result cards</span><br>
         <span class="dot" style="background:#1e9e4a"></span> Under 45 min
@@ -279,7 +297,7 @@
         &nbsp;<span class="dot" style="background:#d6361f"></span> Over 120 min
       </div>
       <div style="margin-top:6px">The selected route is drawn thicker — click any route or card to select it.</div>
-      <div class="disclaimer" style="margin-top:8px">Drive times/distances come from live routing (typical traffic-free conditions) and may differ from Google Maps. Population/capacity figures are point-in-time; most facilities run over design capacity.</div>
+      <div class="disclaimer" style="margin-top:8px">Drive times/distances come from live routing (typical traffic-free conditions) and may differ from Google Maps. Most CDCR institutions house multiple security levels; the marker color reflects the highest level present. Population/capacity figures are point-in-time; nearly every institution runs over design capacity.</div>
     </div>
   </div>
   <div id="map"></div>
@@ -288,30 +306,46 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ---------------------------------------------------------------------------
-// Wisconsin DOC adult institutions — addresses/details verified against the
-// official WIDOC pages (doc.wi.gov) plus Wikipedia/Wikimedia. Population figures
-// are point-in-time snapshots; most facilities run over design capacity.
+// California CDCR adult institutions (31 active, as of January 2026) — roster
+// from CDCR; details verified against official cdcr.ca.gov facility pages plus
+// Wikipedia/Wikimedia. CDCR uses Security Levels I (lowest) to IV (highest)
+// plus Reception Center designations, and most institutions house several
+// levels at once — `security` lists the FULL set housed. `mission` records the
+// facility's primary role/type. Population figures are point-in-time snapshots;
+// nearly every institution runs over design capacity.
 // ---------------------------------------------------------------------------
 const FACILITIES = [
-  { name: "Chippewa Valley Correctional Treatment Facility", phone: "(715) 720-2850", county: "Chippewa County", addr: "2909 E. Park Ave., Chippewa Falls, WI 54729", lat: 44.9280, lon: -91.3502, security: "Minimum", gender: "Male", yearOpened: "2004", population: "300 beds (capacity)", description: "A minimum-security all-male facility focused on substance-abuse treatment and the Earned Release Program; renamed from Highview in 2004.", details: "The 300-bed facility provides full medical, dental, and mental-health services and offers programming in computers, adult basic education, GED, parenting, and reentry alongside its core substance-abuse treatment, having accepted its first inmates on April 20, 2004.", aerial: "https://www.google.com/maps/@44.931417,-91.3482888,166a,35y,211.62h,59.12t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/ChippewaValleyCorrectionalTreatmentFacility.aspx", image: "images/chippewa-valley.jpg" },
-  { name: "Columbia Correctional Institution", phone: "(608) 742-9100", county: "Columbia County", addr: "2925 Columbia Drive, Portage, WI 53901", lat: 43.5656, lon: -89.4919, security: "Maximum (mixed)", gender: "Male", yearOpened: "1986", population: "~830 avg. (FY2018); op. capacity ~541", description: "A maximum-security facility notable for having housed serial killer Jeffrey Dahmer, who was killed there by a fellow inmate in 1994.", details: "Located in Portage with an operating capacity around 541, it offers vocational training in custodial/building maintenance and print works, GED and adult basic education, anger management, and cognitive intervention, plus a 'Dogs on Call' therapy program for inmates in social isolation.", aerial: "https://www.google.com/maps/place/Columbia+Correctional+Institution/@43.5630937,-89.4941342,253a,35y,33.86h,55.7t/data=!3m1!1e3!4m6!3m5!1s0x88ef46ee9bd8977f:0x9888a5da81d9279f!8m2!3d43.5650782!4d-89.4925371!16s%2Fm%2F0282vw0!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/ColumbiaCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/5/5a/Columbia_Correctional_Institution_Wisconsin_with_guard_tower.jpg" },
-  { name: "Dodge Correctional Institution", phone: "(920) 324-5577", county: "Dodge County", addr: "1 W. Lincoln Street, Waupun, WI 53963", lat: 43.6297, lon: -88.7317, security: "Maximum", gender: "Male", yearOpened: "1978", population: "~1,597 (FY2023); op. capacity ~1,165", description: "The central reception, intake and assessment center for all adult male inmates entering Wisconsin's prison system, and the division's central medical center.", details: "Working with the Bureau of Offender Classification and Movement, DCI completes comprehensive assessments to determine each inmate's program needs, custody level, and placement; it received its first inmates in 1978 and handled female reception until that function moved to Taycheedah in December 2004.", aerial: "https://www.google.com/maps/place/Dodge+Correctional+Institute/@43.6286955,-88.7429612,690a,35y,145.42h,36.96t/data=!3m1!1e3!4m6!3m5!1s0x88041ccbf4846de9:0x7dd9bd8453ec176d!8m2!3d43.6242095!4d-88.7396903!16s%2Fm%2F07s7hln!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/DodgeCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/9/90/Entrance_to_Dodge_Correctional_Institution_01.jpg" },
-  { name: "Fox Lake Correctional Institution", phone: "(920) 928-3151", county: "Dodge County", addr: "W10237 Lake Emily Road, Fox Lake, WI 53933", lat: 43.6148, lon: -88.9133, security: "Medium", gender: "Male", yearOpened: "1962", population: "~1,365 (2024); capacity ~979", description: "A medium-security state prison for men, notable as the facility housing Steven Avery of the Netflix documentary 'Making a Murderer.'", details: "It offers technical training in automotive maintenance, cabinetmaking, computer drafting, horticulture, machining, small-engine technology, welding, HVAC, and masonry, plus post-secondary diploma and certificate programs through Moraine Park Technical College and cognitive-intervention and reentry programming.", aerial: "https://www.google.com/maps/place/Fox+Lake+Correctional+Institution/@43.6133468,-88.9058346,370a,35y,283.25h,55.04t/data=!3m1!1e3!4m6!3m5!1s0x8806a590e1748385:0x56a069254cfa0cd4!8m2!3d43.6149518!4d-88.9130011!16s%2Fg%2F11cpj0_h24!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/FoxLakeCorrectionalInstitution.aspx", image: "images/fox-lake.jpg" },
-  { name: "Green Bay Correctional Institution", phone: "(920) 432-4877", county: "Brown County", addr: "2833 Riverside Drive, Green Bay, WI 54307", lat: 44.4710, lon: -88.0380, security: "Maximum", gender: "Male", yearOpened: "1898", population: "~1,008 (Aug 2020); design capacity ~749", description: "One of Wisconsin's oldest maximum-security prisons, opened in 1898 as the Wisconsin State Reformatory and renamed Green Bay Correctional Institution in 1979.", details: "It provides vocational training in cabinetry, construction trades, barbering, graphic arts, and masonry plus treatment for substance abuse, anger management, and sex offenders; the aging facility is slated for closure under a bipartisan-backed state realignment plan targeting completion by the end of 2029.", aerial: "https://www.google.com/maps/place/2833+Riverside+Dr,+Allouez,+WI+54301/@44.4698121,-88.0318101,281a,35y,275.69h,54.93t/data=!3m1!1e3!4m6!3m5!1s0x8802fb6e0a176939:0x64ee09c49f69716!8m2!3d44.4703636!4d-88.03692!16s%2Fg%2F11bw3hq042!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/GreenBayCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/8/82/Wisconsin_State_Reformatory.jpg" },
-  { name: "Jackson Correctional Institution", phone: "(715) 284-4550", county: "Jackson County", addr: "N6500 Haipek Road, Black River Falls, WI 54615", lat: 44.3070, lon: -90.7890, security: "Medium", gender: "Male", yearOpened: "1996", population: "~1,003 (2023); op. capacity ~837", description: "A medium-security adult male prison in rural Jackson County that began receiving inmates in May 1996 and operates above its design capacity.", details: "It offers academic programs (ABE, GED, HSED) and vocational training through Western Technical College in food production, cabinetry, construction, barbering, and masonry, and runs a Badger State Industries shop where inmates manufacture and refurbish highway signs for the state DOT.", aerial: "https://www.google.com/maps/@44.308111,-90.79841,415a,35y,116.78h,54.68t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/JacksonCorrectionalInstitution.aspx", image: "images/jackson.jpg" },
-  { name: "Kettle Moraine Correctional Institution", phone: "(920) 526-3244", county: "Sheboygan County", addr: "W9071 Forest Drive, Plymouth, WI 53073", lat: 43.7175, lon: -88.1506, security: "Medium", gender: "Male", yearOpened: "1962 (adult since 1974)", population: "~1,182 (FY2019); op. capacity ~1,187", description: "A medium-security adult male prison near Plymouth that originally opened in 1962 as a juvenile boys' school before converting to an adult institution in 1974.", details: "It provides vocational training in barbering/cosmetology, cabinet making, computer-aided drafting, custodial skills, masonry, and welding, with students earning college certificates and technical diplomas; a DOC job center opened inside the facility in January 2022 offering reentry job-search services to those within 60 days of release.", aerial: "https://www.google.com/maps/place/Kettle+Moraine+Correctional+Institution/@43.7174577,-88.1600958,464a,35y,67.75h,58.26t/data=!3m1!1e3!4m6!3m5!1s0x88049d0c94678e3d:0xea6f120d69d037a0!8m2!3d43.7235031!4d-88.1491317!16s%2Fm%2F0gfhrnt!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/KettleMoraineCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/e/e2/Kettle_Moraine_Correctional_Institution.jpg" },
-  { name: "Milwaukee Secure Detention Facility", phone: "(414) 212-3535", county: "Milwaukee County", addr: "1015 N. 10th St., Milwaukee, WI 53205", lat: 43.0437, lon: -87.9250, security: "Medium", gender: "Both", yearOpened: "2001", population: "~1,040 (capacity; ~40 female beds)", description: "A medium-security high-rise detention facility in downtown Milwaukee, used largely for probation/parole holds and short-term detainees, including a small female unit.", details: "It provides short-term sanction programming, substance-use disorder treatment, Thinking for a Change, and domestic-violence programs, with roughly 210 beds dedicated to AODA programming focused on Alternatives to Revocation, alongside Adult Basic Education and GED study.", aerial: "https://www.google.com/maps/place/Milwaukee+Secure+Detention+Facility/@43.0436833,-87.930405,220a,35y,89.27h,65.38t/data=!3m1!1e3!4m6!3m5!1s0x88051979e85c6b51:0x3b7e7022d1c1f526!8m2!3d43.0434105!4d-87.9246495!16s%2Fg%2F11cr_7641s!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/MilwaukeeSecureDetentionFacility.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Milwaukee_Secure_Detention_Facility.jpg" },
-  { name: "New Lisbon Correctional Institution", phone: "(608) 562-6400", county: "Juneau County", addr: "2000 Progress Road, New Lisbon, WI 53950", lat: 43.8816, lon: -90.1321, security: "Medium", gender: "Male", yearOpened: "2002", population: "~950–1,200 (sources conflict)", description: "A medium-security state prison for men in Juneau County, built 2001–2002 on a 100-acre site.", details: "It offers academic and vocational education, with vocational training in horticulture and commercial baking certification plus post-secondary correspondence courses, and treatment/reentry programming covering substance abuse, domestic violence, sex-offender treatment, pre-release programming, and restorative justice.", aerial: "https://www.google.com/maps/@43.8775994,-90.1341593,440a,35y,32.62h,43.01t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/NewLisbonCorrectionalInstitution.aspx", image: "images/new-lisbon.jpg" },
-  { name: "Oakhill Correctional Institution", phone: "(608) 835-3101", county: "Dane County", addr: "5212 County Hwy. M, Oregon, WI 53575", lat: 42.9504, lon: -89.4007, security: "Minimum", gender: "Male", yearOpened: "1976", population: "~832 (FY2025); design capacity ~344", description: "A minimum-security adult male facility near Oregon focused on work release and pre-release programming; the campus originally opened in 1941 as the Wisconsin School for Girls.", details: "An itinerant DOC/Workforce Development job center inside the facility provides career-readiness, job-search, apprenticeship, and veterans services for community reentry, while work and technical training include a Badger State Industries upholstery/refinishing operation plus horticulture, food preparation, and construction trades.", aerial: "https://www.google.com/maps/place/Oakhill+Correctional+Institute/@42.9543257,-89.395078,305a,35y,206.36h,46.95t/data=!3m1!1e3!4m6!3m5!1s0x8807b34d83acf4dd:0x1b598106717fadcb!8m2!3d42.9582452!4d-89.395814!16s%2Fm%2F0765wlh!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/OakhillCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/5/58/Oakhill_Correctional_Institution.jpg" },
-  { name: "Oshkosh Correctional Institution", phone: "(920) 231-4010", county: "Winnebago County", addr: "1730 W. Snell Road, Oshkosh, WI 54903", lat: 44.0693, lon: -88.5616, security: "Medium", gender: "Male", yearOpened: "1986", population: "2,000+ recent; capacity ~1,494", description: "One of Wisconsin's largest medium-security prisons, opened in 1986 north of downtown Oshkosh, housing adult male offenders.", details: "It offers vocational training in culinary arts, building maintenance/construction, Braille transcription, and computer skills, plus extensive treatment including a Dual Diagnosis (MICA) program, a Secure Residential Treatment Unit, and a 36-month sex-offender treatment program; reentry offerings include the Earned Release Program and Windows to Work.", aerial: "https://www.google.com/maps/place/Oshkosh+Correctional+Institution/@44.0632459,-88.5654001,512a,35y,34.02h,61.5t/data=!3m1!1e3!4m6!3m5!1s0x8803e9f360f04935:0x6075c07ec3a53ba4!8m2!3d44.0692813!4d-88.5615462!16s%2Fm%2F0j9l9hr!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/OshkoshCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Oshkosh_Correctional_Institution_-_panoramio.jpg/500px-Oshkosh_Correctional_Institution_-_panoramio.jpg" },
-  { name: "Prairie du Chien Correctional Institution", phone: "(608) 326-7828", county: "Crawford County", addr: "500 E. Parrish St., Prairie du Chien, WI 53821", lat: 43.0330, lon: -91.1411, security: "Minimum", gender: "Male", yearOpened: "1997 (minimum since 2021)", population: "op. capacity ~512", description: "Originally a medium-security youthful-offender facility opened in 1997; transitioned to a minimum-security institution for adult males in May 2021.", details: "The conversion to minimum security expanded the institution's project crews and work-release opportunities, letting incarcerated men work in the community to build job skills, pay restitution, and save for reentry, with education and treatment programming also provided.", aerial: "https://www.google.com/maps/place/Prairie+Du+Chien+Correctional+Institution/@43.0365367,-91.1436223,584a,35y,146.66h,33.44t/data=!3m1!1e3!4m6!3m5!1s0x87fc836730e8ed6b:0x79c791fddd4e8ea6!8m2!3d43.0342492!4d-91.1410106!16s%2Fg%2F1tdmffwz!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/PrairieduChienCorrectionalInstitution.aspx", image: "images/prairie-du-chien.jpg" },
-  { name: "Racine Correctional Institution", phone: "(262) 886-3214", county: "Racine County", addr: "2019 Wisconsin St., Sturtevant, WI 53177", lat: 42.7099, lon: -87.9008, security: "Medium", gender: "Male", yearOpened: "1991", population: "~1,610 (June 2023)", description: "A medium-security prison for adult men in Sturtevant that opened in 1991; includes the adjacent minimum-security Sturtevant Transitional Facility.", details: "It offers GED courses, vocational maintenance training in partnership with Gateway Technical College, and cognitive and behavioral programs such as anger management and Thinking for a Change, and operates the Beacon sex-offender treatment program.", aerial: "https://www.google.com/maps/place/Racine+Correctional+Institution/@42.7052583,-87.8984569,387a,35y,328.75h,55.99t/data=!3m1!1e3!4m6!3m5!1s0x88056892b07f5d99:0xdc1455441fcb016!8m2!3d42.7087936!4d-87.9039467!16s%2Fg%2F11c1nqjc8p!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/RacineCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/60/RacineCorrectionalInstitution.JPG/330px-RacineCorrectionalInstitution.JPG" },
-  { name: "Racine Youthful Offender Correctional Facility", phone: "(262) 638-1999", county: "Racine County", addr: "1501 Albert St., Racine, WI 53404", lat: 42.7366, lon: -87.7994, security: "Medium", gender: "Male", yearOpened: "—", population: "capacity ~450", description: "A medium-security facility in the city of Racine dedicated to male offenders ages 18 through 24 sentenced through the adult courts.", details: "Wisconsin's first institution placed in an urban core and designated for a specific age group, it offers vocational training in custodial, masonry, microcomputer (Microsoft certification), and C-Tech, plus substance-use, anger management, domestic violence, and Thinking for a Change programming.", aerial: "https://www.google.com/maps/place/Racine+Youthful+Offender+Correctional+Facility/@42.7346837,-87.8036953,312a,35y,53.53h,52.8t/data=!3m1!1e3!4m6!3m5!1s0x880543bce9fd043b:0xe9c222dab67b5b2!8m2!3d42.7369827!4d-87.7993116!16s%2Fg%2F1tgpnlt1!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/RacineYouthfulOffenderCorrectionalFacility.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Racine_October_2023_014_%28Racine_Youthful_Offender_Correctional_Facility%29.jpg/330px-Racine_October_2023_014_%28Racine_Youthful_Offender_Correctional_Facility%29.jpg" },
-  { name: "Redgranite Correctional Institution", phone: "(920) 566-2600", county: "Waushara County", addr: "1006 County Road EE, Redgranite, WI 54970", lat: 44.0536, lon: -89.1086, security: "Medium", gender: "Male", yearOpened: "2001", population: "~1,033 (2025); op. capacity ~990", description: "A medium-security prison for adult men that received its first inmates in January 2001 on an 89-acre site in Waushara County.", details: "It provides tiered academic education (ABE/GED/HSED), vocational programs in Bakery Fundamentals and Industrial Maintenance Mechanic through Fox Valley Technical College, reentry services like Windows to Work, and a Badger State Industries operation handling electronics and wheelchair recycling.", aerial: "https://www.google.com/maps/place/Redgranite+Correctional+Institute/@44.0568192,-89.1000828,579a,35y,240.86h,50.65t/data=!3m1!1e3!4m6!3m5!1s0x8801155f94ca120f:0xf549c94affabad24!8m2!3d44.0537864!4d-89.1075754!16zL20vMDhtajA5!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/RedgraniteCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/RGCI_2024.jpg/330px-RGCI_2024.jpg" },
-  { name: "Stanley Correctional Institution", phone: "(715) 644-2960", county: "Chippewa County", addr: "100 Corrections Drive, Stanley, WI 54768", lat: 44.9490, lon: -90.9551, security: "Medium", gender: "Male", yearOpened: "2001", population: "~1,500 (op. capacity)", description: "A medium-security state prison for men in Chippewa County, built by a private developer in the late 1990s and purchased by Wisconsin, opening as a state facility in 2001.", details: "It offers vocational training (custodial, Microsoft Office, CAD, and welding) certified through Chippewa Valley Technical College and, beginning fall 2024, hosts a UW-Stout bachelor's degree program; its SCOPES program crafts donated items for the community.", aerial: "https://www.google.com/maps/@44.9525621,-90.9563947,252a,35y,166.44h,58.64t/data=!3m1!1e3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/StanleyCorrectionalInstitution.aspx", image: "images/stanley.jpg" },
-  { name: "Sturtevant Transitional Facility", phone: "(262) 884-2410", county: "Racine County", addr: "9351 Rayne Road, Sturtevant, WI 53177", lat: 42.7140, lon: -87.8984, security: "Minimum / Medium", gender: "Male", yearOpened: "2003", population: "304 (capacity)", description: "A transitional facility for adult men operated as a unit of Racine Correctional Institution, with minimum- (2003) and medium-security (2004) units.", details: "Its 152-bed minimum-security unit focuses on work and study release, averaging about 60 community workers weekly who work locally by day and return nightly, and all minimum-security residents must hold a job assignment or serve on project crews.", aerial: "https://www.google.com/maps/place/Sturtevant+Transitional+Facility/@42.7105699,-87.8975915,191a,35y,338.65h,54.97t/data=!3m1!1e3!4m6!3m5!1s0x880568f6af1c99c1:0x61525e866668dda1!8m2!3d42.7131259!4d-87.8987349!16s%2Fg%2F1tfdf0tg!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/SturtevantTransitionalFacility.aspx", image: "images/sturtevant.jpg" },
-  { name: "Waupun Correctional Institution", phone: "(920) 324-5571", county: "Dodge County", addr: "200 S. Madison Street, Waupun, WI 53963", lat: 43.6296, lon: -88.7314, security: "Maximum", gender: "Male", yearOpened: "1851", population: "~965 (FY2022-23); op. capacity ~1,064", description: "The oldest prison in Wisconsin, this maximum-security facility for men opened in 1851 as the Wisconsin State Prison and was renamed Waupun Correctional Institution in 1977.", details: "Wisconsin's largest maximum-security men's prison, it operates a Behavioral Health Unit for those with mental illness and offers academic classes, vocational training in construction trades and welding, a 1998 health complex, and Badger State Industries work assignments.", aerial: "https://www.google.com/maps/place/Waupun+Correctional+Institution/@43.6313058,-88.7275805,618a,35y,240.39h,27.42t/data=!3m1!1e3!4m6!3m5!1s0x88041ccac6c09e73:0xb7ce8d27eb0354cf!8m2!3d43.6296869!4d-88.7315889!16zL20vMGRxcWhn!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/WaupunCorrectionalInstitution.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/6/6d/Wisconsin_State_Prison_Exterior.jpg" },
-  { name: "Wisconsin Secure Program Facility", phone: "(608) 375-5656", county: "Grant County", addr: "1101 Morrison Drive, Boscobel, WI 53805", lat: 43.1431, lon: -90.6831, security: "Maximum", gender: "Male", yearOpened: "1999", population: "~372 (Nov 2022); capacity ~500", description: "Originally the Supermax Correctional Institution, this maximum-custody facility in Boscobel houses Wisconsin's most disruptive and high-security male inmates.", details: "With about 500 beds, it manages high-risk maximum-custody men across general population, restrictive housing, and administrative confinement units, offering cognitive-focused programming including Cognitive Interventions, anger management, Dialectical Behavior Therapy modules, and Thinking for a Change.", aerial: "https://www.google.com/maps/place/Wisconsin+Secure+Program+Facility/@43.1383598,-90.6838555,304a,35y,7.1h,57.48t/data=!3m1!1e3!4m6!3m5!1s0x87fcf8d10080fb87:0xaf2d37adf57e5272!8m2!3d43.1432007!4d-90.682973!16s%2Fm%2F0dljtk3!5m1!1e1", url: "https://doc.wi.gov/Pages/OffenderInformation/AdultInstitutions/WisconsinSecureProgramFacility.aspx", image: "https://upload.wikimedia.org/wikipedia/commons/1/12/Wisconsin_Secure_Program_Facility.png" }
+  { name: "Avenal State Prison", county: "Kings County", addr: "#1 Kings Way, Avenal, CA 93204", lat: 35.975, lon: -120.120, security: "Level II", mission: "General Population", gender: "Male", yearOpened: "1987", population: "~4,800 (2024); design capacity ~2,909", description: "A Level II (low-medium security) male prison opened in 1987 on a 640-acre site, long one of California's most overcrowded institutions and running well above its ~2,909 design capacity.", details: "Avenal operates as a CDCR Reentry Hub, offering adult basic education, GED and college coursework, 14 Career Technical Education trades, and Integrated Substance Use Disorder Treatment across open-dorm Facilities A–F. It drew national attention for major valley fever (coccidioidomycosis) outbreaks in 2005–2006.", aerial: "https://www.google.com/maps/@35.975,-120.120,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/asp/", image: null },
+  { name: "California Correctional Institution", county: "Kern County", addr: "24900 Highway 202, Tehachapi, CA 93561", lat: 35.111, lon: -118.569, security: "Levels I–IV", mission: "General Population", gender: "Male", yearOpened: "1933", population: "~2,600 (2023); design capacity ~2,172", description: "A male prison in the Tehachapi mountains, opened in 1933 as California's first women's prison and reopened for men in 1954; it houses custody Levels I–IV plus a Security Housing Unit.", details: "CCI offers vocational training (welding, automotive, building maintenance), academic/GED education, Prison Industry Authority manufacturing, and substance-use treatment. Its two maximum-security facilities, added in 1985–86, were considered among the most advanced in the country at the time, and CCI inmate crews assist with California wildfire response.", aerial: "https://www.google.com/maps/@35.111,-118.569,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/cci/", image: null },
+  { name: "California Health Care Facility, Stockton", county: "San Joaquin County", addr: "7707 Austin Road, Stockton, CA 95215", lat: 37.895, lon: -121.194, security: "Levels I–IV, Reception Center", mission: "Medical / Health Care", gender: "Male", yearOpened: "2013", population: "~2,400 (2023); design capacity ~2,951", description: "Opened in 2013, CHCF provides medical and mental-health care to incarcerated men with the most severe and long-term needs, in a 1.4-million-sq-ft, 54-building complex.", details: "Built in response to the federal Plata/Coleman rulings on prison health care, it delivers intermediate inpatient and outpatient care — psychiatric programs, dialysis, dental, memory and palliative care — staffed by roughly 2,500 health professionals, and also operates reception-center functions. A 2019 Legionnaires' disease outbreak was linked to one death.", aerial: "https://www.google.com/maps/@37.895,-121.194,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/chcf/", image: null },
+  { name: "California Institution for Men", county: "San Bernardino County", addr: "14901 Central Avenue, Chino, CA 91710", lat: 33.982, lon: -117.682, security: "Levels I–II, Reception Center", mission: "Reception Center", gender: "Male", yearOpened: "1941", population: "~2,900 (2023); design capacity ~2,763", description: "Opened in 1941 as 'the first major minimum-security institution built and operated in the United States,' CIM houses Level I–II men and runs a reception center processing new commitments from Southern California.", details: "Spanning four facilities, CIM serves as both a reception/classification hub — where many Los Angeles County defendants are first processed — and a general-population institution, with ABE/GED and ESL education, substance-abuse treatment, vocational training, and Veterans-in-Prison programming. Its history includes Kevin Cooper's 1983 escape, an early AIDS ward (1988), and a severe 2020 COVID-19 outbreak.", aerial: "https://www.google.com/maps/@33.982,-117.682,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/cim/", image: null },
+  { name: "California Institution for Women", county: "San Bernardino County", addr: "16756 Chino-Corona Road, Corona, CA 92880", lat: 33.951944, lon: -117.641944, security: "Levels I–III, Reception Center", mission: "Women's", gender: "Female", yearOpened: "1952", population: "~980 (2023); design capacity ~1,398", description: "A female state prison whose grounds are in Chino (despite a Corona mailing address); opened at this site in 1952 and houses Level I–III women plus a reception center.", details: "CIW relocated from Tehachapi after the 1952 Kern County earthquake and provides academic, vocational (cosmetology, computer, building maintenance), and clinical programs including psychiatric inpatient care and pregnancy services. It long held California's female death row; six suicides between 2013 and 2016 prompted scrutiny of its mental-health care.", aerial: "https://www.google.com/maps/@33.951944,-117.641944,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/ciw/", image: "https://upload.wikimedia.org/wikipedia/commons/c/cf/CaliforniaInstitutionforWomen.jpg" },
+  { name: "California Men's Colony", county: "San Luis Obispo County", addr: "Colony Dr, San Luis Obispo, CA 93409", lat: 35.325, lon: -120.698, security: "Levels I–III", mission: "General Population", gender: "Male", yearOpened: "1954", population: "~3,250 (2023); design capacity ~3,816", description: "A male prison near San Luis Obispo split into a minimum-security West Facility and a medium-security East Facility across 356 acres, known for an extensive slate of rehabilitative programs.", details: "CMC operates a Correctional Treatment Center and a 50-bed Mental Health Crisis Unit, and runs Cal Fire wildfire crews and the New Life K-9 service-dog program. Timothy Leary famously escaped from the West Facility in 1970 with help from the Weather Underground.", aerial: "https://www.google.com/maps/@35.325,-120.698,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/cmc/", image: "https://upload.wikimedia.org/wikipedia/commons/9/92/California_Mens_Colony_CDCR.jpg" },
+  { name: "California Medical Facility", county: "Solano County", addr: "1600 California Dr., Vacaville, CA 95696", lat: 38.329, lon: -121.980, security: "Levels I–IV", mission: "Medical / Health Care", gender: "Male", yearOpened: "1955", population: "~2,170 (recent); design capacity ~2,316", description: "Opened in 1955 in Vacaville, the California Medical Facility is the prison system's health-care flagship, providing medical, psychiatric, dental, and hospice care to male felons.", details: "CMF established California's first prison hospice (17 beds) in 1996 and houses acute-care, psychiatric, and specialized units. The Volunteers of Vacaville run an internationally recognized Blind Project in which inmates transcribe books into braille and produce audiobooks.", aerial: "https://www.google.com/maps/@38.329,-121.980,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/cmf/", image: "https://upload.wikimedia.org/wikipedia/commons/8/89/California_Medical_Facility.jpg" },
+  { name: "California Rehabilitation Center", county: "Riverside County", addr: "5th Street & Western, Norco, CA 92860", lat: 33.930, lon: -117.575, security: "Level II", mission: "Substance-Abuse Treatment", gender: "Male", yearOpened: "1962", population: "~3,000 (2023); design capacity ~2,380", description: "A Level II male prison in Norco built on the grounds of the former Lake Norconian Club resort, focused on substance-abuse treatment; it is slated to close by fall 2026.", details: "CRC has run one of the largest in-custody substance-abuse programs and now offers Integrated Substance Use Disorder Treatment alongside vocational and academic programs. It hosts the Actors' Gang prison theater program led by Tim Robbins; its women's unit closed in 2007, making it male-only.", aerial: "https://www.google.com/maps/@33.930,-117.575,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/crc/", image: null },
+  { name: "California State Prison, Corcoran", county: "Kings County", addr: "4001 King Avenue, Corcoran, CA 93212", lat: 36.060, lon: -119.549, security: "Levels I, III, IV", mission: "General Population", gender: "Male", yearOpened: "1988", population: "~3,445 (2023); design capacity ~3,115", description: "A male multi-mission prison opened in 1988, housing Level I, III, and IV inmates plus a Security Housing Unit and a Protective Housing Unit.", details: "Corcoran offers vocational training, education, prison industries, mental-health services, and substance-use treatment. It drew national scrutiny in the 1990s over guard shootings of inmates; its Protective Housing Unit has held high-profile inmates including Charles Manson, Sirhan Sirhan, and Joseph DeAngelo (the Golden State Killer).", aerial: "https://www.google.com/maps/@36.060,-119.549,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/cor/", image: "https://upload.wikimedia.org/wikipedia/commons/1/1b/CSP_Corcoran.jpg" },
+  { name: "California State Prison, Los Angeles County", county: "Los Angeles County", addr: "44750 60th Street West, Lancaster, CA 93536-7620", lat: 34.694, lon: -118.228, security: "Levels I, III, IV, Reception Center", mission: "General Population", gender: "Male", yearOpened: "1993", population: "~2,500 (2023); design capacity ~2,300", description: "Opened in 1993, the first and only state prison in Los Angeles County; it houses Level I, III, and IV men and serves as a hub for Enhanced Outpatient mental-health care.", details: "LAC operates as a reentry hub with vocational training and Prison Industry Authority laundry and soap operations, and runs the Disability Placement Program. It was built to relieve overcrowding from LA County, which historically supplied much of the state's prison population while hosting no prisons.", aerial: "https://www.google.com/maps/@34.694,-118.228,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/lac/", image: null },
+  { name: "California State Prison, Sacramento", county: "Sacramento County", addr: "100 Prison Road, Represa, CA 95671", lat: 38.6939, lon: -121.1531, security: "Levels I, IV", mission: "General Population", gender: "Male", yearOpened: "1986", population: "~1,590 (2023); design capacity ~1,828", description: "A maximum-security men's prison adjacent to Folsom, originally 'New Folsom,' opened in 1986; it uses the highly secure 180-degree housing design and holds high-security and mental-health-needs inmates.", details: "It houses primarily Level IV inmates plus a Level I Minimum Support Facility and provides education, vocational training, substance-use treatment, and three levels of mental-health care. Erik Menendez has been among those incarcerated here; the prison saw major riots in 1996, 2011, and 2015.", aerial: "https://www.google.com/maps/@38.6939,-121.1531,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/sac/", image: null },
+  { name: "California State Prison, Solano", county: "Solano County", addr: "2100 Peabody Road, Vacaville, CA 95696", lat: 38.3219, lon: -121.9750, security: "Levels II–III", mission: "General Population", gender: "Male", yearOpened: "1984", population: "~3,326 (2023); design capacity ~2,594", description: "A medium-security men's prison in Vacaville on about 146 acres, operating Level II dormitory and Level III celled housing with a comprehensive work and training program.", details: "Opened in 1984 under the adjacent California Medical Facility before becoming independent in 1992, it offers prison-industry jobs (bindery, laundry, metal fabrication, optical), vocational training, academic education, and substance-use treatment. A 2001 federal ruling affirmed Muslim inmates' right to weekly services and to wear beards.", aerial: "https://www.google.com/maps/@38.3219,-121.9750,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/sol/", image: null },
+  { name: "Calipatria State Prison", county: "Imperial County", addr: "7018 Blair Road, Calipatria, CA 92233", lat: 33.1661, lon: -115.4861, security: "Levels I, IV, Reception Center", mission: "General Population", gender: "Male", yearOpened: "1992", population: "~2,500 (2023); design capacity ~2,308", description: "A predominantly Level IV men's prison in Imperial County with a Level I component and reception function; at 184 ft below sea level it sits at the lowest elevation of any prison in the Western Hemisphere.", details: "Opened in 1992, Calipatria installed a controversial electrified perimeter fence in 1993, later modified after it killed birds. It provides vocational training, academic education, and a multi-track Integrated Substance Use Disorder Treatment program; it saw significant gang violence in the 1990s and a major riot in 2005.", aerial: "https://www.google.com/maps/@33.1661,-115.4861,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/cal/", image: null },
+  { name: "Centinela State Prison", county: "Imperial County", addr: "2302 Brown Road, Imperial, CA 92251", lat: 32.8231, lon: -115.7889, security: "Levels I, III, IV", mission: "General Population", gender: "Male", yearOpened: "1993", population: "~2,773 (2023); design capacity ~2,308", description: "A men's prison on roughly 2,000 acres in Imperial County housing Level I, III, and IV inmates, including a Sensitive Needs Yard, surrounded by electrified fencing.", details: "Opened in 1993 about 22 months after nearby Calipatria, Centinela was by 1997 the state's most overcrowded prison at 259% capacity. It includes a Correctional Treatment Center and offers vocational training, education, and substance-use treatment, plus a program training Level I inmates as certified structural and wildland firefighters.", aerial: "https://www.google.com/maps/@32.8231,-115.7889,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/cen/", image: null },
+  { name: "Central California Women's Facility", county: "Madera County", addr: "23370 Road 22, Chowchilla, CA 93610", lat: 37.0931, lon: -120.1531, security: "Levels I–IV, Reception Center", mission: "Women's", gender: "Female", yearOpened: "1990", population: "~2,279 (2023); design capacity ~1,990", description: "The largest women's prison in California and one of the largest in the U.S., on a 640-acre Chowchilla complex; it houses women at all security levels, a reception center, and the state's only female death row.", details: "Opened in 1990, its women's death-row unit was established in 1991. It provides academic and vocational training (cosmetology, electronics, auto body, computer technology), college coursework, substance-use treatment, and family-reunification programs, and has faced controversies over inmate medical care.", aerial: "https://www.google.com/maps/@37.0931,-120.1531,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/ccwf/", image: "https://upload.wikimedia.org/wikipedia/commons/2/2c/CentralCaliforniaWomensFacility.jpg" },
+  { name: "Correctional Training Facility", county: "Monterey County", addr: "Highway 101 North, Soledad, CA 93960", lat: 36.46917, lon: -121.38333, security: "Levels I–II", mission: "General Population", gender: "Male", yearOpened: "1946", population: "~3,927 (2023); design capacity ~2,800", description: "Known as Soledad State Prison, CTF is a male institution in Monterey County comprising North and Central facilities (South closed in 2022), housing minimum- and medium-security general population.", details: "Opened in 1946 and originally administered by San Quentin, CTF emphasizes rehabilitation through education, vocational training (welding, carpentry, HVAC), college programs, and substance-use treatment, and runs a service-dog training program and a Veterans housing unit described as the first of its kind in the U.S.", aerial: "https://www.google.com/maps/@36.46917,-121.38333,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/ctf/", image: null },
+  { name: "Folsom State Prison", county: "Sacramento County", addr: "300 Prison Road, Represa, CA 95671", lat: 38.695, lon: -121.1625, security: "Levels I–III", mission: "General Population", gender: "Male", yearOpened: "1880", population: "~2,513 (2023); design capacity ~2,065", description: "California's second-oldest prison (after San Quentin), opened in 1880 and among the first in the nation to use electricity; world-famous for Johnny Cash's 1968 'At Folsom Prison' concert.", details: "Built largely with inmate labor from locally quarried granite, Folsom is now medium-security, housing Level II–III general-population men plus a Level I support facility. It offers GED, ESL, and career-technical education through the Greystone Adult School, substance-use treatment, and Prison Industry Authority operations including license-plate manufacturing.", aerial: "https://www.google.com/maps/@38.695,-121.1625,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/fsp/", image: "https://upload.wikimedia.org/wikipedia/commons/3/31/FolsomStatePrison_%28cropped%29.jpg" },
+  { name: "High Desert State Prison", county: "Lassen County", addr: "475-750 Rice Canyon Rd., Susanville, CA 96127", lat: 40.4084, lon: -120.5139, security: "Levels I–IV", mission: "General Population", gender: "Male", yearOpened: "1995", population: "~2,362 (2023); design capacity ~2,324", description: "A high-security men's prison about 8 miles east of Susanville, opened in 1995; it houses a broad custody range (Levels I–IV) across four main facilities plus minimum, treatment, and restrictive-housing units.", details: "Activated to house maximum-custody Level IV inmates, HDSP converted its reception center to Level III general population in 2012 and serves long-term, specialized mental-health, and high-risk-medical populations. It offers career-technical and academic education and self-help and reentry programming; a 2015 Inspector General report criticized officer-misconduct allegations and a culture of insularity.", aerial: "https://www.google.com/maps/@40.4084,-120.5139,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/hdsp/", image: null },
+  { name: "Ironwood State Prison", county: "Riverside County", addr: "19005 Wiley's Well Road, Blythe, CA 92225", lat: 33.55889, lon: -114.92667, security: "Levels I–II", mission: "General Population", gender: "Male", yearOpened: "1994", population: "~3,300 (recent); design capacity ~2,200", description: "A male prison on about 640 acres near Blythe, opened in 1994 and named for the region's native ironwood trees; it houses minimum- and medium-custody men across Level II facilities and a Level I support facility.", details: "Designated a Reentry Hub for inmates within four years of release, ISP offers GED/ABE and college coursework, vocational training, substance-use treatment, and rehabilitation initiatives such as The Last Mile coding program; in 2014 it hosted a TEDx conference attended by Richard Branson.", aerial: "https://www.google.com/maps/@33.55889,-114.92667,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/isp/", image: null },
+  { name: "Kern Valley State Prison", county: "Kern County", addr: "3000 West Cecil Avenue, Delano, CA 93216-6000", lat: 35.7661, lon: -119.3251, security: "Levels I, IV", mission: "General Population", gender: "Male", yearOpened: "2005", population: "~3,293 (2026); design capacity ~2,448", description: "A male prison in Delano opened in 2005, built around four Level IV (maximum-security) 180-design housing facilities plus a Level I Minimum Support Facility; adjacent to North Kern State Prison.", details: "Across roughly 600 acres, KVSP comprises four semi-autonomous Level IV facilities and two Administrative Segregation Units. It offers Career Technical Education (auto, welding, plumbing, electrical, masonry, computer/electronics, small-engine repair), GED/adult basic education, and Integrated Substance Use Disorder Treatment.", aerial: "https://www.google.com/maps/@35.7661,-119.3251,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/kvsp/", image: null },
+  { name: "Mule Creek State Prison", county: "Amador County", addr: "4001 Highway 104, Ione, CA 95640", lat: 38.3703, lon: -120.9532, security: "Levels I–IV, Reception Center", mission: "General Population", gender: "Male", yearOpened: "1987", population: "~3,824 (2023); design capacity ~3,284", description: "A male prison near Ione in the Sierra foothills, opened in 1987; it houses general-population Levels I–IV with a reception center and a large Sensitive Needs Yard / mental-health population.", details: "The 866-acre prison became a major Sensitive Needs Yard institution after 2005, housing inmates segregated for safety, and serves as a mental-health hub for EOP and CCCMS care. It offers extensive rehabilitative programming; in 2024 two deaths during family visits led CDCR to suspend that program pending investigation.", aerial: "https://www.google.com/maps/@38.3703,-120.9532,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/mcsp/", image: null },
+  { name: "North Kern State Prison", county: "Kern County", addr: "2737 West Cecil Avenue, Delano, CA 93215", lat: 35.7819, lon: -119.3095, security: "Reception Center; Levels I, III, IV", mission: "Reception Center", gender: "Male", yearOpened: "1993", population: "~4,380 (2023); design capacity ~2,694", description: "A male prison in Delano functioning primarily as a reception center, processing newly committed inmates (typically within ~90 days) before assignment elsewhere; it also operates medium-custody and minimum-support units.", details: "Opened in 1993 during California's prison-population surge, NKSP assesses incoming inmates' criminal, health, and social needs and offers GED/ESL/ABE education, vocational training, Integrated Substance Use Disorder Treatment, and family-reunification support.", aerial: "https://www.google.com/maps/@35.7819,-119.3095,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/nksp/", image: null },
+  { name: "Pelican Bay State Prison", county: "Del Norte County", addr: "5905 Lake Earl Drive, Crescent City, CA 95531", lat: 41.855, lon: -124.150, security: "Levels I, II, IV", mission: "General Population", gender: "Male", yearOpened: "1989", population: "~2,054 (recent); design capacity ~2,380", description: "A maximum-security prison near Crescent City on California's far-northern coast, opened in 1989 and best known as the state's supermax housing its long-term Security Housing Unit (SHU); it houses Levels I, II, and IV men.", details: "Built to isolate prison-gang leaders, its X-shaped SHU became a focus of human-rights criticism; a 1995 federal ruling (Madrid v. Gomez) found excessive force, and PBSP was the epicenter of the 2011 and 2013 hunger strikes that led to the 2015 Ashker settlement ending indefinite SHU isolation. It is now shifting toward rehabilitative programming under the California Model.", aerial: "https://www.google.com/maps/@41.855,-124.150,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/pbsp/", image: "https://upload.wikimedia.org/wikipedia/commons/3/35/Aerial_shot_of_Pelican_Bay_State_Prison%2C_taken_27-July-2009.jpg" },
+  { name: "Pleasant Valley State Prison", county: "Fresno County", addr: "24863 West Jayne Avenue, Coalinga, CA 93210", lat: 36.1316, lon: -120.2490, security: "Levels I–IV", mission: "General Population", gender: "Male", yearOpened: "1994", population: "~2,562 (2023); design capacity ~2,308", description: "A male general-population prison in Coalinga, Fresno County, opened in 1994 and housing inmates of all custody levels (I–IV) on about 640 acres.", details: "PVSP offers career-technical education (welding, auto, electrical, HVAC), academic and college programs, substance-use treatment, and a Youth Offender Program. It is best known for a major valley-fever (coccidioidomycosis) outbreak in the mid-2000s linked to several deaths, prompting policy changes excluding high-risk inmates from the area.", aerial: "https://www.google.com/maps/@36.1316,-120.2490,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/pvsp/", image: null },
+  { name: "Richard J. Donovan Correctional Facility", county: "San Diego County", addr: "480 Alta Road, San Diego, CA 92179", lat: 32.5846, lon: -116.9334, security: "Levels I–IV", mission: "General Population", gender: "Male", yearOpened: "1987", population: "~2,920 (2023); design capacity ~2,992", description: "The only state prison in San Diego County, near Otay Mesa, opened in 1987; it houses all four custody levels (I–IV) and is a designated treatment center for inmates with severe mental illness and developmental disabilities.", details: "RJD operated as a Southern California reception center until 2012, when it shifted to its current general-population and treatment mission. It runs extensive CALPIA prison industries (a large bakery and a shoe factory), vocational and academic programs, and substance-abuse treatment; in 2021 a court ordered guards to wear body cameras after documented excessive-force incidents.", aerial: "https://www.google.com/maps/@32.5846,-116.9334,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/rjd/", image: "https://upload.wikimedia.org/wikipedia/commons/d/d3/CDCR_-_Richard_J._Donovan_Correctional_Facility_by_Don_Ramey_Logan.jpg" },
+  { name: "Salinas Valley State Prison", county: "Monterey County", addr: "31625 Highway 101, Soledad, CA 93960", lat: 36.4792, lon: -121.3739, security: "Levels I, III, IV", mission: "General Population", gender: "Male", yearOpened: "1996", population: "~2,934 (2023); design capacity ~2,452", description: "A maximum-security men's prison about 5 miles north of Soledad, opened in 1996; it houses Level I, III, and IV inmates including Sensitive Needs Yards, with a major mental-health mission.", details: "SVSP runs a licensed Psychiatric Inpatient Program (brought under CDCR operation in 2017), an Enhanced Outpatient Program, and Mental Health Crisis Beds, and is a flagship site for CDCR's 'California Model' rehabilitation and wellness reforms, with academic, vocational, religious, and self-help programming.", aerial: "https://www.google.com/maps/@36.4792,-121.3739,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/svsp/", image: null },
+  { name: "San Quentin Rehabilitation Center", county: "Marin County", addr: "100 Main St, San Quentin, CA 94964", lat: 37.939, lon: -122.489, security: "Levels I–III", mission: "Rehabilitation / Reentry", gender: "Male", yearOpened: "1852", population: "~3,542 (2023); design capacity ~3,084", description: "California's oldest prison, opened in 1852 on Point San Quentin north of San Francisco; renamed San Quentin Rehabilitation Center in 2023 as the flagship of the Norway-inspired 'California Model.'", details: "Housing a Level I–III population, SQ emphasizes college degree programs, vocational training, substance-abuse treatment, pre-release preparation, and the inmate-produced San Quentin News. It historically operated the nation's largest death row and California's only male execution chamber (dismantled in 2019); under the 2019 moratorium most condemned inmates have been transferred out.", aerial: "https://www.google.com/maps/@37.939,-122.489,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/sqrc/", image: "https://upload.wikimedia.org/wikipedia/commons/e/e9/San_Quentin_Prison.jpg" },
+  { name: "Sierra Conservation Center", county: "Tuolumne County", addr: "5100 O'Byrnes Ferry Road, Jamestown, CA 95327", lat: 37.8906, lon: -120.5378, security: "Levels I–III", mission: "Conservation / Training", gender: "Male", yearOpened: "1965", population: "~4,461 (2023); design capacity ~3,404", description: "A male prison near Jamestown on about 420 acres, opened in 1965; the central hub of California's adult conservation (fire) camp program, training minimum- and medium-custody people for wildland firefighting.", details: "In partnership with CAL FIRE and the Los Angeles County Fire Department, SCC trains and assigns incarcerated crews to conservation camps statewide and oversees the Pine Grove Youth Conservation Camp, alongside on-site vocational and academic programs.", aerial: "https://www.google.com/maps/@37.8906,-120.5378,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/scc/", image: null },
+  { name: "Substance Abuse Treatment Facility and State Prison, Corcoran", county: "Kings County", addr: "900 Quebec Avenue, Corcoran, CA 93212", lat: 36.053, lon: -119.549, security: "Levels II–IV", mission: "Substance-Abuse Treatment", gender: "Male", yearOpened: "1997", population: "~4,650 (2023); design capacity ~3,424", description: "A male prison in Corcoran opened in 1997 and built around substance-abuse treatment; one of the largest prisons in the world by capacity, housing Level II–IV inmates.", details: "SATF operates two self-contained therapeutic-community treatment facilities where inmates undergo at least 20 hours per week of counseling, addiction education, relapse prevention, and living-skills programming — among the largest addiction-treatment operations in the world — plus vocational training, education, and healthcare. It is administratively distinct from the adjacent CSP-Corcoran.", aerial: "https://www.google.com/maps/@36.053,-119.549,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/satf/", image: null },
+  { name: "Valley State Prison", county: "Madera County", addr: "21633 Avenue 24, Chowchilla, CA 93610", lat: 37.1050, lon: -120.1550, security: "Level II", mission: "General Population", gender: "Male", yearOpened: "1995", population: "~3,017 (2026); design capacity ~1,961", description: "A Level II general-population men's prison in Chowchilla for inmates requiring Sensitive Needs Yard placement; built in 1995 as Valley State Prison for Women and converted to all-male in 2012–13.", details: "Now a CDCR Reentry Hub, VSP offers Integrated Substance Use Disorder Treatment, academic and vocational education, Prison Industry Authority employment, and an Enhanced Outpatient Program for mental-health care.", aerial: "https://www.google.com/maps/@37.1050,-120.1550,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/vsp/", image: null },
+  { name: "Wasco State Prison", county: "Kern County", addr: "701 Scofield Avenue, Wasco, CA 93280", lat: 35.5939, lon: -119.4087, security: "Reception Center; Levels I–III", mission: "Reception Center", gender: "Male", yearOpened: "1991", population: "~3,698 (2023); design capacity ~2,984", description: "A male institution in Kern County opened in 1991, serving primarily as a reception center for intake and diagnosis of newly committed inmates, alongside medium-custody and minimum-support units.", details: "As a reception center, WSP classifies and evaluates newly incarcerated people to determine security level, program needs, and placement; beyond intake it operates a 1,000-bed medium-custody facility and offers academic education, vocational training, substance-abuse counseling, and parenting and anger-management classes on its ~634-acre site.", aerial: "https://www.google.com/maps/@35.5939,-119.4087,300a,35y,45h,62t/data=!3m1!1e3", url: "https://www.cdcr.ca.gov/facility-locator/wsp/", image: null }
 ];
 
 // Base layers: clean street map + Esri aerial imagery (with place/road labels overlaid).
@@ -326,34 +360,73 @@ const satellite = L.layerGroup([
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 })
 ]);
 
-const map = L.map('map', { layers: [streets] }).setView([44.5, -89.8], 7);
+const map = L.map('map', { layers: [streets] }).setView([37.2, -119.5], 6);
 L.control.layers({ 'Map': streets, 'Satellite': satellite }, null, { position: 'topright' }).addTo(map);
 
-// Facility markers encode SECURITY LEVEL by shape + color, with a cell-block glyph.
+// Facility markers encode SECURITY LEVEL by color (by the highest level housed)
+// and MISSION/type by a white glyph, on a consistent round badge.
 // (Drive time is encoded separately, on the routes / bubbles / result cards.)
-const SEC_SHAPES = {
-  circ: '<circle cx="16" cy="16" r="13" fill="currentColor" stroke="#fff" stroke-width="2.5"/>',
-  sq:   '<rect x="3" y="3" width="26" height="26" rx="6" fill="currentColor" stroke="#fff" stroke-width="2.5"/>',
-  tri:  '<path d="M16 2.5 L29.5 28 L2.5 28 Z" fill="currentColor" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>',
-  diam: '<path d="M16 2 L30 16 L16 30 L2 16 Z" fill="currentColor" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>'
-};
-const SEC_GLYPH = '<rect x="11" y="12.5" width="10" height="8.5" rx="1" fill="#fff"/>'
-  + '<g fill="currentColor"><rect x="12.7" y="14.3" width="1.5" height="4.7"/><rect x="15.25" y="14.3" width="1.5" height="4.7"/><rect x="17.8" y="14.3" width="1.5" height="4.7"/></g>';
+const SEC_COLORS = { I: '#2f9e44', II: '#1c7ed6', III: '#ec7a1c', IV: '#c92a2a', R: '#5c6b7a' };
 
-// Highest level present wins, so a single marker reads cleanly (e.g. "Maximum (mixed)" -> Maximum).
+// Mission glyphs (white on the security-colored badge; viewBox 0 0 32 32).
+const MISSION_GLYPH = {
+  gp: '<rect x="11" y="12.5" width="10" height="8.5" rx="1" fill="#fff"/><g fill="currentColor"><rect x="12.7" y="14.3" width="1.5" height="4.7"/><rect x="15.25" y="14.3" width="1.5" height="4.7"/><rect x="17.8" y="14.3" width="1.5" height="4.7"/></g>',
+  rc: '<path d="M16 8 L16 19 M16 19 L11.5 14.5 M16 19 L20.5 14.5" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="10" y="21.5" width="12" height="2.4" rx="1" fill="#fff"/>',
+  wm: '<circle cx="16" cy="13.5" r="4.4" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M16 18 L16 24 M13 21 L19 21" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>',
+  md: '<path d="M14 9 h4 v5 h5 v4 h-5 v5 h-4 v-5 h-5 v-4 h5 z" fill="#fff"/>',
+  sa: '<path d="M16 8 C16 8 10 15 10 19 a6 6 0 0 0 12 0 C22 15 16 8 16 8 z" fill="#fff"/>',
+  cv: '<path d="M16 8 C13 12 18 13 15 18 C20 17 14 23 19 16 C20 19 19 22 16 24 C12 24 9.5 21 10.5 17 C11.5 13 16 13 16 8 z" fill="#fff"/>',
+  rh: '<rect x="11" y="10" width="10" height="13" rx="1" fill="#fff"/><rect x="13" y="12.5" width="6" height="10.5" fill="currentColor"/><circle cx="17.4" cy="18" r="1" fill="#fff"/>'
+};
+const MISSION_LABELS = { gp: 'General Population', rc: 'Reception Center', wm: "Women's", md: 'Medical / Health Care', sa: 'Substance-Abuse Treatment', cv: 'Conservation / Training', rh: 'Rehabilitation / Reentry' };
+
+// Parse the (possibly multi-level) `security` string into a canonical level array:
+// I / II / III / IV / Reception. Handles ranges ("I–IV"), explicit lists
+// ("I, III, IV"), single levels ("Level II"), and "Reception Center".
+function secCategories(s) {
+  s = String(s || '');
+  const cats = new Set();
+  if (/reception/i.test(s)) cats.add('Reception');
+  const ROM = { I: 1, II: 2, III: 3, IV: 4 }, NUM = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
+  const norm = s.replace(/[–—]/g, '-'); // en/em dash -> hyphen
+  let m;
+  const rangeRe = /\b(IV|III|II|I)\s*-\s*(IV|III|II|I)\b/g;
+  while ((m = rangeRe.exec(norm))) {
+    const a = ROM[m[1]], b = ROM[m[2]];
+    for (let k = Math.min(a, b); k <= Math.max(a, b); k++) cats.add(NUM[k]);
+  }
+  const rest = norm.replace(rangeRe, ' '); // drop ranges, then pick up standalone levels
+  const singleRe = /\b(IV|III|II|I)\b/g;
+  while ((m = singleRe.exec(rest))) cats.add(m[1]);
+  return ['I', 'II', 'III', 'IV', 'Reception'].filter(c => cats.has(c));
+}
+
+// Marker color = the highest numeric level housed; slate if only Reception/none.
 function securityOf(f) {
-  const s = (f.security || '').toLowerCase();
-  if (s.includes('maximum')) return { key: 'max',   label: 'Maximum', color: '#e03131', shape: 'tri'  };
-  if (s.includes('medium'))  return { key: 'med',   label: 'Medium',  color: '#1c7ed6', shape: 'sq'   };
-  if (s.includes('minimum')) return { key: 'min',   label: 'Minimum', color: '#2f9e44', shape: 'circ' };
-  return                            { key: 'other', label: 'Other',   color: '#5c6b7a', shape: 'diam' };
+  const lv = secCategories(f.security);
+  for (const L of ['IV', 'III', 'II', 'I']) if (lv.includes(L)) return { level: L, color: SEC_COLORS[L] };
+  return { level: 'Reception', color: SEC_COLORS.R };
+}
+
+// Marker glyph = mission/type, derived from the canonical `mission` string.
+function missionOf(f) {
+  const m = (f.mission || '').toLowerCase();
+  let key = 'gp';
+  if (/women/.test(m)) key = 'wm';
+  else if (/medical|health care/.test(m)) key = 'md';
+  else if (/substance/.test(m)) key = 'sa';
+  else if (/conservation/.test(m)) key = 'cv';
+  else if (/reception/.test(m)) key = 'rc';
+  else if (/reentry|rehabilitation/.test(m)) key = 'rh';
+  return { key, label: MISSION_LABELS[key] };
 }
 
 // emphasis = true for facilities in the current results (drawn larger).
 function facilityIcon(f, emphasis) {
-  const sec = securityOf(f);
+  const color = securityOf(f).color;
+  const glyph = MISSION_GLYPH[missionOf(f).key];
   const size = emphasis ? 34 : 26;
-  const html = `<svg width="${size}" height="${size}" viewBox="0 0 32 32" style="color:${sec.color}">${SEC_SHAPES[sec.shape]}${SEC_GLYPH}</svg>`;
+  const html = `<svg width="${size}" height="${size}" viewBox="0 0 32 32" style="color:${color}"><circle cx="16" cy="16" r="13.5" fill="currentColor" stroke="#fff" stroke-width="2.5"/>${glyph}</svg>`;
   return L.divIcon({
     className: 'fac-mk' + (emphasis ? ' emph' : ''),
     html, iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2]
@@ -369,6 +442,16 @@ const originIcon = () => L.divIcon({
   </svg>`,
   iconSize: [34, 44], iconAnchor: [17, 42], popupAnchor: [0, -38]
 });
+
+// Populate the legend swatches from the marker scheme above.
+(function buildLegend() {
+  const secLeg = [['I', 'Level I'], ['II', 'Level II'], ['III', 'Level III'], ['IV', 'Level IV'], ['R', 'Reception / none']];
+  document.getElementById('secLegend').innerHTML = secLeg.map(([k, lab]) =>
+    `<span class="leg-item"><svg width="15" height="15" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="${SEC_COLORS[k]}" stroke="#fff" stroke-width="2.5"/></svg>${lab}</span>`).join('');
+  const misLeg = [['gp', 'Gen. pop.'], ['rc', 'Reception'], ['wm', "Women's"], ['md', 'Medical'], ['sa', 'Substance-abuse'], ['cv', 'Conservation'], ['rh', 'Reentry']];
+  document.getElementById('missionLegend').innerHTML = misLeg.map(([k, lab]) =>
+    `<span class="leg-item"><svg width="17" height="17" viewBox="0 0 32 32" style="color:#5c6b7a"><circle cx="16" cy="16" r="13.5" fill="currentColor" stroke="#fff" stroke-width="2.5"/>${MISSION_GLYPH[k]}</svg>${lab}</span>`).join('');
+})();
 
 function esc(s) {
   return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -386,17 +469,17 @@ function popupHtml(f) {
       <h3>${esc(f.name)}</h3>
       <p class="paddr">${esc(f.addr)}</p>
       <dl class="meta">
+        ${row('Mission', f.mission)}
         ${row('Security', f.security)}
         ${row('Houses', f.gender)}
         ${row('County', f.county)}
         ${row('Opened', f.yearOpened)}
         ${row('Population', f.population)}
-        ${f.phone ? `<dt>Phone</dt><dd><a href="tel:${f.phone.replace(/[^0-9]/g,'')}">${esc(f.phone)}</a></dd>` : ''}
       </dl>
       <p class="desc">${esc(f.description)}</p>
       ${f.details ? `<p class="desc">${esc(f.details)}</p>` : ''}
       <div class="links">
-        <a class="gov" href="${f.url}" target="_blank" rel="noopener">Official WIDOC page &rarr;</a>
+        <a class="gov" href="${f.url}" target="_blank" rel="noopener">Official CDCR page &rarr;</a>
         <a class="gov" href="${aerialUrl}" target="_blank" rel="noopener">Aerial 3D view &#8599;</a>
         <a class="gov" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(f.name + ', ' + f.addr)}" target="_blank" rel="noopener">Open in Maps &#8599;</a>
       </div>
@@ -410,37 +493,31 @@ const markers = FACILITIES.map((f, i) => {
   m.bindTooltip(`<b>${esc(f.name)}</b><br>${esc(f.addr)}`, { direction: 'top', offset: [0,-15], opacity: 0.95 });
   m.bindPopup(popupHtml(f), { maxWidth: 300, minWidth: 300, autoPan: true });
   m.on('click', () => { if (routeByIdx[i]) highlightRoute(i); else map.flyTo([f.lat, f.lon], 13); });
-  // faint always-visible name label below the circle (toggled by zoom + filters)
+  // faint always-visible name label below the badge (toggled by zoom + filters)
   nameLabels[i] = L.tooltip({ permanent: true, direction: 'bottom', className: 'fac-name-label', offset: [0, 15], interactive: false })
     .setLatLng([f.lat, f.lon]).setContent(esc(f.name));
   return m;
 });
 
-// ---- Filter by security level / gender ----
+// ---- Filter by security level / mission / gender ----
 const LABEL_MIN_ZOOM = 10;
 let passesFilter = FACILITIES.map(() => true);
 
-function secCategories(s) {
-  s = (s || '').toLowerCase();
-  const cats = [];
-  if (s.includes('minimum')) cats.push('Minimum');
-  if (s.includes('medium')) cats.push('Medium');
-  if (s.includes('maximum')) cats.push('Maximum');
-  return cats;
-}
 function readFilters() {
   return {
     secs: [...document.querySelectorAll('.f-sec:checked')].map(c => c.value),
+    miss: [...document.querySelectorAll('.f-mis:checked')].map(c => c.value),
     gens: [...document.querySelectorAll('.f-gen:checked')].map(c => c.value)
   };
 }
 function facilityPasses(f, filt) {
   const cats = secCategories(f.security);
   const secOk = cats.length === 0 ? true : cats.some(c => filt.secs.includes(c));
+  const misOk = filt.miss.includes(missionOf(f).key);
   const genOk = f.gender === 'Both'
     ? (filt.gens.includes('Male') || filt.gens.includes('Female'))
     : filt.gens.includes(f.gender);
-  return secOk && genOk;
+  return secOk && misOk && genOk;
 }
 function refreshLabels() {
   const showZoom = map.getZoom() >= LABEL_MIN_ZOOM;
@@ -463,7 +540,7 @@ function applyFilters() {
   if (badge) badge.textContent = `${shown} of ${FACILITIES.length} shown`;
 }
 map.on('zoomend', refreshLabels);
-document.querySelectorAll('.f-sec, .f-gen').forEach(c => c.addEventListener('change', applyFilters));
+document.querySelectorAll('.f-sec, .f-mis, .f-gen').forEach(c => c.addEventListener('change', applyFilters));
 applyFilters();
 
 let originMarker = null;
@@ -471,7 +548,7 @@ let routeLayerGroup = L.layerGroup().addTo(map);
 let routeByIdx = {}; // facility index -> { layer, label, color }
 
 // Drive-time color scoring — green <45, yellow 45–75, orange 75–120, red >120.
-// `key` maps to a .rl-* CSS class; `color` is used for route lines & markers.
+// `key` maps to a .rl-* CSS class; `color` is used for route lines & cards.
 function driveBucket(min) {
   if (min < 45)  return { key: 'g', color: '#1e9e4a', text: '#fff' };
   if (min < 75)  return { key: 'y', color: '#f2c200', text: '#3a2f00' };
@@ -549,7 +626,7 @@ document.getElementById('searchForm').addEventListener('submit', async (e) => {
   let geo;
   try {
     const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q='
-      + encodeURIComponent(query + ', Wisconsin');
+      + encodeURIComponent(query + ', California');
     const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
     geo = await res.json();
   } catch (err) {
@@ -660,6 +737,7 @@ function renderResults() {
     card.innerHTML = `
       <div><span class="rank" style="background:${bucket.color};color:${bucket.text}">${idx+1}</span><span class="name">${esc(r.f.name)}</span></div>
       <div class="addr">${esc(r.f.addr)}</div>
+      <div class="cmeta"><b>${esc(missionOf(r.f).label)}</b> &middot; ${esc(r.f.security)}</div>
       <div class="dist">${label}</div>`;
     card.addEventListener('click', () => {
       markers[r.i].openPopup();
@@ -693,7 +771,7 @@ async function fetchSuggestions(q) {
   sugController = new AbortController();
   try {
     const url = 'https://nominatim.openstreetmap.org/search?format=json&addressdetails=0&limit=6&countrycodes=us&q='
-      + encodeURIComponent(q + ', Wisconsin');
+      + encodeURIComponent(q + ', California');
     const res = await fetch(url, { headers: { 'Accept': 'application/json' }, signal: sugController.signal });
     const data = await res.json();
     if (addrInput.value.trim().length < 3) return; // user cleared the box mid-request
@@ -759,17 +837,17 @@ function resetMap() {
   routeLayerGroup.clearLayers();
   routeByIdx = {};
   if (originMarker) { map.removeLayer(originMarker); originMarker = null; }
-  document.querySelectorAll('.f-sec, .f-gen').forEach(c => { c.checked = true; });
+  document.querySelectorAll('.f-sec, .f-mis, .f-gen').forEach(c => { c.checked = true; });
   applyFilters();
   statusEl.innerHTML = DEFAULT_STATUS;
   statusEl.className = 'status';
   statusEl.style.display = 'block';
-  map.setView([44.5, -89.8], 7);
+  map.setView([37.2, -119.5], 6);
 }
 document.getElementById('resetBtn').addEventListener('click', resetMap);
 
 // ---- Recent searches (persisted in localStorage, last 5) ----
-const RECENT_KEY = 'widoc-recent';
+const RECENT_KEY = 'cdcr-recent';
 const recentEl = document.getElementById('recent');
 const recentChipsEl = document.getElementById('recentChips');
 
@@ -816,7 +894,7 @@ FACILITIES
   .forEach(({ f, i }) => {
     const item = document.createElement('div');
     item.className = 'browse-item';
-    item.innerHTML = `<span class="bi-name">${esc(f.name)}</span><span class="bi-sub">${esc(f.security)}</span>`;
+    item.innerHTML = `<span class="bi-name">${esc(f.name)}</span><span class="bi-sub">${esc(missionOf(f).label)}<br>${esc(f.security)}</span>`;
     item.addEventListener('click', () => {
       map.flyTo([f.lat, f.lon], 13);
       // open the marker's popup if visible, else a standalone popup (e.g. when filtered out)
