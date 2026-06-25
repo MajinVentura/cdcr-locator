@@ -76,13 +76,21 @@
   .suggest .s-sub { font-size: 12px; color: var(--muted); }
   .main { flex: 1; display: flex; min-height: 0; }
   #panel {
-    width: 600px;
+    width: 420px;
+    min-width: 220px;
+    max-width: 780px;
     background: var(--panel);
     border-right: 1px solid var(--line);
     overflow-y: auto;
     padding: 16px;
+    flex: none;
   }
-  #map { flex: 1; }
+  #panel-resize-handle {
+    width: 5px; flex: none; cursor: col-resize;
+    background: var(--line); transition: background .15s;
+  }
+  #panel-resize-handle:hover { background: var(--accent); }
+  #map { flex: 1; min-width: 0; }
   .status { color: var(--muted); font-size: 14px; padding: 8px 2px; }
   .status.error { color: var(--hot); font-weight: 600; }
   .origin {
@@ -144,7 +152,7 @@
   .browse-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
   .browse-item:last-child { border-bottom: none; }
   .browse-item:hover { background: #eef3f9; }
-  .browse-item .bi-name { font-weight: 600; }
+  .browse-item .bi-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .browse-item .bi-sub { font-size: 11px; color: var(--muted); white-space: nowrap; text-align: right; }
   .legend {
     font-size: 13.5px; color: #3f4d59; margin-top: 16px;
@@ -188,9 +196,9 @@
 
   /* Always-on facility name labels */
   .fac-name-label {
-    background: rgba(255,255,255,0.88); border: none;
-    box-shadow: 0 1px 3px rgba(0,0,0,.2); padding: 2px 6px; border-radius: 4px;
+    background: transparent; border: none; box-shadow: none; padding: 0;
     color: #14202b; font-size: 11px; font-weight: 700;
+    text-shadow: 0 0 4px #fff, 0 0 4px #fff, 0 0 3px #fff, 0 0 3px #fff;
     pointer-events: none;
   }
   .fac-name-label::before { display: none; }
@@ -301,6 +309,7 @@
       <div class="disclaimer" style="margin-top:8px">Drive times/distances come from live routing (typical traffic-free conditions) and may differ from Google Maps. Most CDCR institutions house multiple security levels; the marker color reflects the highest level present. Population/capacity figures are point-in-time; nearly every institution runs over design capacity.</div>
     </div>
   </div>
+  <div id="panel-resize-handle"></div>
   <div id="map"></div>
 </div>
 
@@ -928,6 +937,7 @@ FACILITIES
       .replace('Conservation / Training', 'Conservation')
       .replace('Rehabilitation / Reentry', 'Reentry');
     const secLabel = highestLevel(f) + (f.gender === 'Female' ? ' · ♀' : '');
+    item.title = facName(f);
     item.innerHTML = `<span class="bi-name">${esc(facName(f))}</span><span class="bi-sub">${esc(mLabel)}<br>${esc(secLabel)}</span>`;
     item.addEventListener('click', () => {
       map.flyTo([f.lat, f.lon], 13);
@@ -937,6 +947,30 @@ FACILITIES
     });
     browseListEl.appendChild(item);
   });
+
+// ---- Resizable panel drag handle ----
+(function() {
+  const handle = document.getElementById('panel-resize-handle');
+  const panelEl = document.getElementById('panel');
+  let dragging = false, startX, startW;
+  handle.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startW = panelEl.offsetWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    panelEl.style.width = Math.max(220, Math.min(780, startW + (e.clientX - startX))) + 'px';
+    map.invalidateSize();
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
 </script>
 </body>
 </html>
