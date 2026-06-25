@@ -135,9 +135,10 @@
   .chip:hover { border-color: var(--accent); background: #e3edf8; }
   /* browse all facilities (collapsible) */
   .browse { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
-  .browse summary { cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: 600; list-style: none; user-select: none; }
+  .browse summary { cursor: pointer; padding: 10px 12px; font-size: 13px; font-weight: 600; list-style: none; user-select: none; background: var(--accent); color: #fff; border-radius: 7px 7px 0 0; }
+  .browse:not([open]) summary { border-radius: 7px; }
   .browse summary::-webkit-details-marker { display: none; }
-  .browse summary::before { content: '\25B8'; margin-right: 6px; color: var(--muted); display: inline-block; transition: transform .15s; }
+  .browse summary::before { content: '\25B8'; margin-right: 6px; color: rgba(255,255,255,.75); display: inline-block; transition: transform .15s; }
   .browse[open] summary::before { transform: rotate(90deg); }
   .browse-list { max-height: calc(100vh - 230px); overflow-y: auto; border-top: 1px solid var(--line); }
   .browse-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid var(--line); }
@@ -512,7 +513,12 @@ const markers = FACILITIES.map((f, i) => {
   m.on('click', () => { if (routeByIdx[i]) highlightRoute(i); else map.flyTo([f.lat, f.lon], 13); });
   // faint always-visible name label below the badge (toggled by zoom + filters)
   nameLabels[i] = L.tooltip({ permanent: true, direction: 'bottom', className: 'fac-name-label', offset: [0, 15], interactive: false })
-    .setLatLng([f.lat, f.lon]).setContent(esc(facAbbr(f) || f.name));
+    .setLatLng([f.lat, f.lon]).setContent((() => {
+      const abbr = facAbbr(f);
+      return abbr
+        ? `<b>${esc(abbr)}</b><br><span style="font-weight:500;font-size:10px">${esc(f.name)}</span>`
+        : esc(f.name);
+    })());
   return m;
 });
 
